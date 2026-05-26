@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '../lib/supabaseServer';
+import { createAdminClient } from '../lib/supabaseAdmin';
 
 export default function Home() {
   return null;
@@ -12,15 +13,15 @@ export async function getServerSideProps({ req, res }) {
     return { redirect: { destination: '/login', permanent: false } };
   }
 
-  const { data: profile } = await supabase
+  const admin = createAdminClient();
+  const { data: profile } = await admin
     .from('profiles')
     .select('role')
     .eq('id', session.user.id)
     .single();
 
-  if (profile?.role === 'manager') {
-    return { redirect: { destination: '/admin', permanent: false } };
-  }
+  if (!profile) return { redirect: { destination: '/login', permanent: false } };
+  if (profile.role === 'manager') return { redirect: { destination: '/admin', permanent: false } };
 
   return { redirect: { destination: '/dashboard', permanent: false } };
 }

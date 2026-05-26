@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
+import { createAdminClient } from '../lib/supabaseAdmin';
 import { createClient } from '../lib/supabaseClient';
 
 const GREEN = '#005F2C';
@@ -401,7 +402,9 @@ export async function getServerSideProps({ req, res }) {
 
   if (!session) return { redirect: { destination: '/login', permanent: false } };
 
-  const { data: profile } = await supabase
+  // Use admin client to bypass RLS for server-side profile lookup
+  const admin = createAdminClient();
+  const { data: profile } = await admin
     .from('profiles')
     .select('*')
     .eq('id', session.user.id)
