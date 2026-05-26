@@ -7,7 +7,7 @@ import { createClient } from '../lib/supabaseClient';
 
 const GREEN = '#005F2C';
 const LOCATIONS = ['All Locations', 'Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
-const CHECKLIST = ['metafields', 'title', 'price', 'photographs', 'specifications', 'condition'];
+const CHECKLIST = ['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'];
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -33,7 +33,6 @@ export default function Admin({ profile }) {
   const [location, setLocation] = useState('All Locations');
   const [listings, setListings] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -48,19 +47,17 @@ export default function Admin({ profile }) {
     setLoading(true);
     const weekStart = getWeekStart();
 
-    const [{ data: allListings }, { data: allEmployees }, { data: allSessions }] = await Promise.all([
+    const [{ data: allListings }, { data: allEmployees }] = await Promise.all([
       supabase
         .from('listings')
         .select('*, profiles(full_name, location)')
         .gte('date', weekStart)
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('*').order('full_name'),
-      supabase.from('daily_sessions').select('*, profiles(full_name, location)').gte('date', weekStart),
     ]);
 
     setListings(allListings || []);
     setEmployees(allEmployees || []);
-    setSessions(allSessions || []);
     setLoading(false);
   }, []);
 
@@ -114,9 +111,8 @@ export default function Admin({ profile }) {
   // Employee summary for selected date
   const employeeSummary = employees.map(emp => {
     const empListings = filteredListings.filter(l => l.user_id === emp.id);
-    const session = sessions.find(s => s.user_id === emp.id && s.date === date);
     const complete = empListings.filter(l => CHECKLIST.every(c => l[c])).length;
-    return { emp, count: empListings.length, complete, session };
+    return { emp, count: empListings.length, complete };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
 
   return (
@@ -220,21 +216,18 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Start', 'Lunch', 'Finish', 'Listings', 'Complete', 'Incomplete'].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Complete', 'Incomplete'].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={8} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
-                  ) : employeeSummary.map(({ emp, count, complete, session }, i) => (
+                    <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                  ) : employeeSummary.map(({ emp, count, complete }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{emp.full_name}</td>
                       <td style={tdStyle}>{emp.location}</td>
-                      <td style={tdStyle}>{session?.start_time?.slice(0, 5) || '—'}</td>
-                      <td style={tdStyle}>{session?.lunch_time?.slice(0, 5) || '—'}</td>
-                      <td style={tdStyle}>{session?.finish_time?.slice(0, 5) || '—'}</td>
                       <td style={{ ...tdStyle, fontWeight: 700, fontSize: 15 }}>
                         <span style={{ color: GREEN }}>{count}</span>
                       </td>
@@ -253,9 +246,6 @@ export default function Admin({ profile }) {
                   <tfoot>
                     <tr style={{ background: '#f0f4f0', fontWeight: 700 }}>
                       <td style={{ ...tdStyle, fontWeight: 800 }}>TOTAL</td>
-                      <td style={tdStyle}></td>
-                      <td style={tdStyle}></td>
-                      <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
                       <td style={{ ...tdStyle, fontSize: 15, color: GREEN }}>{employeeSummary.reduce((s, e) => s + e.count, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
@@ -278,7 +268,7 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photos', 'Specs', 'Condition', 'Comments'].map(h => (
+                      {['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photos', 'Specs', 'Serial ✓', 'Condition', 'Comments'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>

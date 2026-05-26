@@ -54,42 +54,24 @@ export default function Dashboard({ profile, _debug }) {
   const router = useRouter();
   const supabase = createClient();
 
-  const [session, setSession] = useState(null);
   const [listings, setListings] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [listedAt, setListedAt] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [sessionSaving, setSessionSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
   const loadData = useCallback(async () => {
-    const date = today();
-
-    const [{ data: sess }, { data: list }] = await Promise.all([
-      supabase.from('daily_sessions').select('*').eq('user_id', profile.id).eq('date', date).maybeSingle(),
-      supabase.from('listings').select('*').eq('user_id', profile.id).eq('date', date).order('created_at', { ascending: false }),
-    ]);
-
-    setSession(sess || { start_time: '', lunch_time: '', finish_time: '' });
+    const { data: list } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('user_id', profile.id)
+      .eq('date', today())
+      .order('created_at', { ascending: false });
     setListings(list || []);
   }, [profile.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  async function handleSessionSave() {
-    setSessionSaving(true);
-    const date = today();
-    const payload = {
-      user_id: profile.id,
-      date,
-      start_time: session.start_time || null,
-      lunch_time: session.lunch_time || null,
-      finish_time: session.finish_time || null,
-    };
-    await supabase.from('daily_sessions').upsert(payload, { onConflict: 'user_id,date' });
-    setSessionSaving(false);
-    showSuccess('Times saved.');
-  }
 
   async function handleListingSubmit(e) {
     e.preventDefault();
@@ -106,6 +88,7 @@ export default function Dashboard({ profile, _debug }) {
     });
     if (err) { setError('Failed to save listing. Try again.'); setSubmitting(false); return; }
     setForm(EMPTY_FORM);
+    setListedAt(null);
     setSubmitting(false);
     showSuccess('Listing saved!');
     loadData();
@@ -130,13 +113,6 @@ export default function Dashboard({ profile, _debug }) {
   function allChecked(listing) {
     return CHECKLIST.every(c => listing[c.key]);
   }
-
-  const weekStart = (() => {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-    return d.toISOString().slice(0, 10);
-  })();
 
   return (
     <>
@@ -189,31 +165,6 @@ export default function Dashboard({ profile, _debug }) {
             }}>{successMsg}</div>
           )}
 
-          {/* Today's session */}
-          <div style={cardStyle}>
-            <h2 style={cardTitleStyle}>Today's Hours — {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 14 }}>
-              {[
-                { key: 'start_time', label: 'Start' },
-                { key: 'lunch_time', label: 'Lunch' },
-                { key: 'finish_time', label: 'Finish' },
-              ].map(({ key, label }) => (
-                <div key={key}>
-                  <label style={labelStyle}>{label}</label>
-                  <input
-                    type="time"
-                    value={session?.[key] || ''}
-                    onChange={e => setSession(s => ({ ...s, [key]: e.target.value }))}
-                    style={{ ...inputStyle, width: 130 }}
-                  />
-                </div>
-              ))}
-              <button onClick={handleSessionSave} disabled={sessionSaving} style={btnStyle}>
-                {sessionSaving ? 'Saving…' : 'Save Times'}
-              </button>
-            </div>
-          </div>
-
           {/* Add listing form */}
           <div style={cardStyle}>
             <h2 style={cardTitleStyle}>Log a Listing</h2>
@@ -224,11 +175,26 @@ export default function Dashboard({ profile, _debug }) {
                   <input
                     type="text"
                     value={form.serial_id}
-                    onChange={e => setForm(f => ({ ...f, serial_id: e.target.value }))}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(f => ({ ...f, serial_id: val }));
+                      if (val && !form.serial_id) setListedAt(new Date());
+                      if (!val) setListedAt(null);
+                    }}
                     style={inputStyle}
                     placeholder="e.g. GC-12345"
                   />
                 </div>
+                {listedAt && (
+                  <div style={{ flex: '0 0 auto' }}>
+                    <label style={labelStyle}>Date / Time</label>
+                    <input
+                      readOnly
+                      value={`${listedAt.toLocaleDateString('en-GB')}  ${listedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}
+                      style={{ ...inputStyle, width: 160, background: '#f0f7f0', color: '#444', cursor: 'default' }}
+                    />
+                  </div>
+                )}
                 <div style={{ flex: '1 1 260px' }}>
                   <label style={labelStyle}>Photos / Comments</label>
                   <input
