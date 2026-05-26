@@ -1,0 +1,17 @@
+{
+  "name": "gc4c-listings-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.29",
+    "react": "^18",
+    "react-dom": "^18",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.49.4"
+  }
+}
