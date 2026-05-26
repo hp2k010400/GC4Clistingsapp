@@ -35,12 +35,15 @@ function formatTime(t) {
   return t.slice(0, 5);
 }
 
-export default function Dashboard({ profile }) {
+export default function Dashboard({ profile, _debug }) {
   if (!profile) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f4' }}>
         <div style={{ textAlign: 'center', padding: 40 }}>
           <p style={{ color: '#c0392b', fontWeight: 600, marginBottom: 12 }}>Account not set up yet — contact your manager.</p>
+          <pre style={{ textAlign: 'left', background: '#eee', padding: 12, borderRadius: 6, fontSize: 11, marginBottom: 12 }}>
+            {JSON.stringify(_debug, null, 2)}
+          </pre>
           <a href="/login" style={{ color: '#005F2C', fontWeight: 700 }}>Back to login</a>
         </div>
       </div>
@@ -412,9 +415,8 @@ export async function getServerSideProps({ req, res }) {
 
   if (!session) return { redirect: { destination: '/login', permanent: false } };
 
-  // Use admin client to bypass RLS for server-side profile lookup
   const admin = createAdminClient();
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from('profiles')
     .select('*')
     .eq('id', session.user.id)
@@ -422,5 +424,14 @@ export async function getServerSideProps({ req, res }) {
 
   if (profile?.role === 'manager') return { redirect: { destination: '/admin', permanent: false } };
 
-  return { props: { profile: profile || null } };
+  return {
+    props: {
+      profile: profile || null,
+      _debug: {
+        userId: session.user.id,
+        profileError: profileError?.message || null,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      },
+    },
+  };
 }
