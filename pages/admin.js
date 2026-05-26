@@ -25,6 +25,18 @@ function formatTime(isoStr) {
   return new Date(isoStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+function downloadCSV(filename, headers, rows) {
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Admin({ profile }) {
   const router = useRouter();
   const supabase = createClient();
@@ -114,6 +126,33 @@ export default function Admin({ profile }) {
     setCreating(false);
     loadData();
     setTimeout(() => { setCreateSuccess(''); setShowCreate(false); }, 2000);
+  }
+
+  function exportOverview() {
+    const headers = ['Employee', 'Location', 'Date', 'Listings', 'Complete', 'Incomplete'];
+    const rows = employeeSummary.map(({ emp, count, complete }) => [
+      emp.full_name, emp.location, date, count, complete, count - complete,
+    ]);
+    downloadCSV(`gc4c-overview-${date}.csv`, headers, rows);
+  }
+
+  function exportListings() {
+    const headers = ['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Comments'];
+    const rows = filteredListings.map(l => [
+      formatTime(l.created_at),
+      l.profiles?.full_name,
+      l.profiles?.location,
+      l.serial_id,
+      l.metafields ? 'Yes' : 'No',
+      l.title ? 'Yes' : 'No',
+      l.price ? 'Yes' : 'No',
+      l.photographs ? 'Yes' : 'No',
+      l.specifications ? 'Yes' : 'No',
+      l.serial_id_checked ? 'Yes' : 'No',
+      l.condition ? 'Yes' : 'No',
+      l.photos_comments || '',
+    ]);
+    downloadCSV(`gc4c-listings-${date}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
   }
 
   // Filtered listings for selected date + location
@@ -235,6 +274,9 @@ export default function Admin({ profile }) {
 
             /* Employee overview table */
             <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={exportOverview} style={exportBtnStyle}>↓ Export CSV</button>
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
@@ -289,9 +331,12 @@ export default function Admin({ profile }) {
 
             /* All listings table */
             <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
-              <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', fontWeight: 700, fontSize: 14 }}>
-                {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
-                {location !== 'All Locations' ? ` — ${location}` : ''} on {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>
+                  {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
+                  {location !== 'All Locations' ? ` — ${location}` : ''} on {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </span>
+                <button onClick={exportListings} style={exportBtnStyle}>↓ Export CSV</button>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -438,6 +483,11 @@ const thStyle = {
   color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
 };
 const tdStyle = { padding: '8px 12px', verticalAlign: 'middle' };
+const exportBtnStyle = {
+  background: '#f0f4f0', border: '1px solid #d0d0d0', borderRadius: 6,
+  padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#333',
+  whiteSpace: 'nowrap',
+};
 
 export async function getServerSideProps({ req, res }) {
   const supabase = createServerSupabaseClient(req, res);
