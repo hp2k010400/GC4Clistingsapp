@@ -42,6 +42,8 @@ export default function Admin({ profile }) {
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [creating, setCreating] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -62,6 +64,21 @@ export default function Admin({ profile }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function handleBulkImport() {
+    if (!confirm('Create all 25 staff accounts? This is a one-time action.')) return;
+    setBulkImporting(true);
+    setBulkResult(null);
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/bulk-create', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${sess?.access_token}` },
+    });
+    const data = await res.json();
+    setBulkResult(data);
+    setBulkImporting(false);
+    loadData();
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -140,6 +157,10 @@ export default function Admin({ profile }) {
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
             }}>+ Add Employee</button>
+            <button onClick={handleBulkImport} disabled={bulkImporting} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              padding: '4px 12px', borderRadius: 5, cursor: bulkImporting ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600,
+            }}>{bulkImporting ? 'Importing…' : 'Import All Staff'}</button>
             <span style={{ opacity: 0.85 }}>{profile.full_name}</span>
             <button onClick={handleLogout} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
@@ -173,6 +194,23 @@ export default function Admin({ profile }) {
               </div>
             ))}
           </div>
+
+          {/* Bulk import result */}
+          {bulkResult && (
+            <div style={{
+              background: '#d4edda', border: '1px solid #c3e6cb', borderRadius: 8,
+              padding: '12px 16px', marginBottom: 16, fontSize: 13,
+            }}>
+              <strong>Import complete:</strong> {bulkResult.created?.length || 0} created
+              {bulkResult.skipped?.length > 0 && `, ${bulkResult.skipped.length} already existed`}
+              {bulkResult.failed?.length > 0 && (
+                <span style={{ color: '#c0392b' }}>, {bulkResult.failed.length} failed: {bulkResult.failed.map(f => f.name).join(', ')}</span>
+              )}
+              <button onClick={() => setBulkResult(null)} style={{
+                marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#555',
+              }}>✕</button>
+            </div>
+          )}
 
           {/* Filters + tabs */}
           <div style={{
