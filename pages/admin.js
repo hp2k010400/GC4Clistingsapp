@@ -54,7 +54,7 @@ export default function Admin({ profile }) {
         .select('*, profiles(full_name, location)')
         .gte('date', weekStart)
         .order('created_at', { ascending: false }),
-      supabase.from('profiles').select('*').eq('role', 'employee').order('full_name'),
+      supabase.from('profiles').select('*').order('full_name'),
       supabase.from('daily_sessions').select('*, profiles(full_name, location)').gte('date', weekStart),
     ]);
 
@@ -136,6 +136,10 @@ export default function Admin({ profile }) {
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
+            <button onClick={() => router.push('/my-listings')} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}>My Listings</button>
             <button onClick={() => setShowCreate(true)} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
