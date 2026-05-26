@@ -212,7 +212,7 @@ export default function Admin({ profile }) {
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>
 
           {/* Location cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
             {locationSummary.map(({ loc, todayCount, weekCount }) => (
               <div key={loc} style={{
                 background: '#fff', borderRadius: 10, padding: '14px 16px',
@@ -233,6 +233,28 @@ export default function Admin({ profile }) {
                 </div>
               </div>
             ))}
+            <div style={{
+              background: GREEN, borderRadius: 10, padding: '14px 16px',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
+              borderTop: `3px solid rgba(0,0,0,0.15)`,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>Business Total</div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                    {locationSummary.reduce((s, l) => s + l.todayCount, 0)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>Today</div>
+                </div>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.25)' }} />
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                    {locationSummary.reduce((s, l) => s + l.weekCount, 0)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>This Week</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Filters + tabs */}
