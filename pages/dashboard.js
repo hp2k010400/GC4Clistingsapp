@@ -12,6 +12,7 @@ const CHECKLIST = [
   { key: 'price', label: 'Price' },
   { key: 'photographs', label: 'Photographs' },
   { key: 'specifications', label: 'Specifications' },
+  { key: 'serial_id_checked', label: 'Serial ID' },
   { key: 'condition', label: 'Condition' },
 ];
 
@@ -23,6 +24,7 @@ const EMPTY_FORM = {
   price: false,
   photographs: false,
   specifications: false,
+  serial_id_checked: false,
   condition: false,
 };
 
