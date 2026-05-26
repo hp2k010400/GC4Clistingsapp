@@ -17,19 +17,13 @@ export default function Login() {
     setError('');
     setLoading(true);
     const supabase = createClient();
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
       setError('Incorrect email or password.');
       setLoading(false);
       return;
     }
-    // Fetch profile client-side to redirect straight to the right page
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .single();
-    router.push(profile?.role === 'manager' ? '/admin' : '/dashboard');
+    router.push('/dashboard');
   }
 
   return (
