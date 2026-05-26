@@ -133,10 +133,6 @@ const inputStyle = {
   background: '#fafafa',
 };
 
-export async function getServerSideProps({ req, res }) {
-  const { createServerSupabaseClient } = await import('../lib/supabaseServer');
-  const supabase = createServerSupabaseClient(req, res);
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) return { redirect: { destination: '/', permanent: false } };
+export async function getServerSideProps() {
   return { props: {} };
 }

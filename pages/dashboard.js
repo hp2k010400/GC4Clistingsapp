@@ -36,6 +36,16 @@ function formatTime(t) {
 }
 
 export default function Dashboard({ profile }) {
+  if (!profile) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f4' }}>
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <p style={{ color: '#c0392b', fontWeight: 600, marginBottom: 12 }}>Account not set up yet — contact your manager.</p>
+          <a href="/login" style={{ color: '#005F2C', fontWeight: 700 }}>Back to login</a>
+        </div>
+      </div>
+    );
+  }
   const router = useRouter();
   const supabase = createClient();
 
@@ -410,8 +420,7 @@ export async function getServerSideProps({ req, res }) {
     .eq('id', session.user.id)
     .single();
 
-  if (!profile) return { redirect: { destination: '/login', permanent: false } };
-  if (profile.role === 'manager') return { redirect: { destination: '/admin', permanent: false } };
+  if (profile?.role === 'manager') return { redirect: { destination: '/admin', permanent: false } };
 
-  return { props: { profile } };
+  return { props: { profile: profile || null } };
 }
