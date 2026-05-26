@@ -58,6 +58,9 @@ export default function Admin({ profile }) {
   const [resetPassword, setResetPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSaving, setResetSaving] = useState(false);
+  const [commentTarget, setCommentTarget] = useState(null);
+  const [commentText, setCommentText] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -95,6 +98,16 @@ export default function Admin({ profile }) {
     if (!res.ok) { setResetError(data.error || 'Failed to reset password.'); return; }
     setResetTarget(null);
     setResetPassword('');
+  }
+
+  async function handleSaveComment(e) {
+    e.preventDefault();
+    setCommentSaving(true);
+    await supabase.from('listings').update({ manager_comment: commentText.trim() || null }).eq('id', commentTarget.id);
+    setCommentSaving(false);
+    setCommentTarget(null);
+    setCommentText('');
+    loadData();
   }
 
   async function handleLogout() {
@@ -137,7 +150,7 @@ export default function Admin({ profile }) {
   }
 
   function exportListings() {
-    const headers = ['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Comments'];
+    const headers = ['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Notes', 'Manager Note'];
     const rows = filteredListings.map(l => [
       formatTime(l.created_at),
       l.profiles?.full_name,
@@ -151,6 +164,7 @@ export default function Admin({ profile }) {
       l.serial_id_checked ? 'Yes' : 'No',
       l.condition ? 'Yes' : 'No',
       l.photos_comments || '',
+      l.manager_comment || '',
     ]);
     downloadCSV(`gc4c-listings-${date}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
   }
@@ -364,14 +378,14 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photos', 'Specs', 'Serial ✓', 'Condition', 'Comments'].map(h => (
+                      {['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Notes', 'Photos', 'Manager Note'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredListings.length === 0 ? (
-                      <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
+                      <tr><td colSpan={14} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
                     ) : filteredListings.map((l, i) => (
                       <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                         <td style={tdStyle}>{formatTime(l.created_at)}</td>
@@ -385,8 +399,42 @@ export default function Admin({ profile }) {
                               : <span style={{ color: '#ddd' }}>–</span>}
                           </td>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, color: '#666', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {l.photos_comments || ''}
+                        </td>
+                        <td style={tdStyle}>
+                          {l.photo_urls?.length > 0 ? (
+                            <div style={{ display: 'flex', gap: 3 }}>
+                              {l.photo_urls.map((url, idx) => (
+                                <a key={idx} href={url} target="_blank" rel="noreferrer">
+                                  <img src={url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, border: '1px solid #ddd' }} />
+                                </a>
+                              ))}
+                            </div>
+                          ) : <span style={{ color: '#ddd' }}>—</span>}
+                        </td>
+                        <td style={tdStyle}>
+                          <button
+                            onClick={() => { setCommentTarget(l); setCommentText(l.manager_comment || ''); }}
+                            style={{
+                              background: 'none',
+                              border: `1px solid ${l.manager_comment ? '#c3e6cb' : '#e0e0e0'}`,
+                              borderRadius: 5,
+                              cursor: 'pointer',
+                              color: l.manager_comment ? '#155724' : '#aaa',
+                              fontSize: 11,
+                              padding: '2px 7px',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 120,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title={l.manager_comment || 'Add note'}
+                          >
+                            {l.manager_comment
+                              ? (l.manager_comment.length > 16 ? l.manager_comment.slice(0, 16) + '…' : l.manager_comment)
+                              : '+ Add note'}
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -451,6 +499,42 @@ export default function Admin({ profile }) {
                 }}>
                   {creating ? 'Creating…' : 'Create'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manager comment modal */}
+      {commentTarget && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }} onClick={e => e.target === e.currentTarget && setCommentTarget(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Manager Note</h2>
+            <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+              {commentTarget.serial_id} — {commentTarget.profiles?.full_name}
+            </p>
+            <form onSubmit={handleSaveComment}>
+              <textarea
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                rows={4}
+                autoFocus
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
+                placeholder="Add a manager note…"
+              />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+                <button type="button" onClick={() => setCommentTarget(null)} style={{
+                  padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd',
+                  background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                }}>Cancel</button>
+                <button type="submit" disabled={commentSaving} style={{
+                  padding: '8px 18px', borderRadius: 6, border: 'none',
+                  background: commentSaving ? '#aaa' : GREEN, color: '#fff',
+                  cursor: commentSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+                }}>{commentSaving ? 'Saving…' : 'Save'}</button>
               </div>
             </form>
           </div>

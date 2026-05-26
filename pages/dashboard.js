@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
@@ -58,6 +58,8 @@ export default function Dashboard({ profile, _debug }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [listedAt, setListedAt] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [photoFiles, setPhotoFiles] = useState([]);
+  const photoInputRef = useRef(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [showChangePw, setShowChangePw] = useState(false);
@@ -84,15 +86,32 @@ export default function Dashboard({ profile, _debug }) {
     if (!allTicked) { setError('All checklist items must be ticked before submitting.'); return; }
     setError('');
     setSubmitting(true);
+
+    const ts = Date.now();
+    const photo_urls = [];
+    for (let i = 0; i < photoFiles.length; i++) {
+      const file = photoFiles[i];
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${profile.id}/${ts}_${i}_${safeName}`;
+      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(path, file);
+      if (!uploadErr) {
+        const { data: { publicUrl } } = supabase.storage.from('listing-photos').getPublicUrl(path);
+        photo_urls.push(publicUrl);
+      }
+    }
+
     const { error: err } = await supabase.from('listings').insert({
       user_id: profile.id,
       date: today(),
       ...form,
       serial_id: form.serial_id.trim(),
+      photo_urls: photo_urls.length > 0 ? photo_urls : null,
     });
     if (err) { setError('Failed to save listing. Try again.'); setSubmitting(false); return; }
     setForm(EMPTY_FORM);
     setListedAt(null);
+    setPhotoFiles([]);
+    if (photoInputRef.current) photoInputRef.current.value = '';
     setSubmitting(false);
     showSuccess('Listing saved!');
     loadData();
@@ -217,8 +236,8 @@ export default function Dashboard({ profile, _debug }) {
                     />
                   </div>
                 )}
-                <div style={{ flex: '1 1 260px' }}>
-                  <label style={labelStyle}>Photos / Comments</label>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={labelStyle}>Notes</label>
                   <input
                     type="text"
                     value={form.photos_comments}
@@ -226,6 +245,22 @@ export default function Dashboard({ profile, _debug }) {
                     style={inputStyle}
                     placeholder="Optional notes"
                   />
+                </div>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={labelStyle}>Photos</label>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={e => setPhotoFiles(Array.from(e.target.files))}
+                    style={{ fontSize: 13, marginTop: 2, width: '100%' }}
+                  />
+                  {photoFiles.length > 0 && (
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                      {photoFiles.length} photo{photoFiles.length !== 1 ? 's' : ''} selected
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -294,7 +329,8 @@ export default function Dashboard({ profile, _debug }) {
                       <th style={thStyle}>Time</th>
                       <th style={thStyle}>Serial ID</th>
                       {CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}
-                      <th style={thStyle}>Comments</th>
+                      <th style={thStyle}>Notes</th>
+                      <th style={thStyle}>Photos</th>
                       <th style={thStyle}></th>
                     </tr>
                   </thead>
@@ -310,8 +346,19 @@ export default function Dashboard({ profile, _debug }) {
                               : <span style={{ color: '#ccc' }}>–</span>}
                           </td>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, color: '#666', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {l.photos_comments || ''}
+                        </td>
+                        <td style={tdStyle}>
+                          {l.photo_urls?.length > 0 ? (
+                            <div style={{ display: 'flex', gap: 3 }}>
+                              {l.photo_urls.map((url, idx) => (
+                                <a key={idx} href={url} target="_blank" rel="noreferrer">
+                                  <img src={url} alt="" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+                                </a>
+                              ))}
+                            </div>
+                          ) : <span style={{ color: '#ccc' }}>—</span>}
                         </td>
                         <td style={tdStyle}>
                           <button onClick={() => handleDelete(l.id)} style={{
