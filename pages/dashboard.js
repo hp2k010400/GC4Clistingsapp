@@ -92,6 +92,8 @@ export default function Dashboard({ profile, _debug }) {
   async function handleListingSubmit(e) {
     e.preventDefault();
     if (!form.serial_id.trim()) { setError('Serial ID is required.'); return; }
+    const allTicked = CHECKLIST.every(c => form[c.key]);
+    if (!allTicked) { setError('All checklist items must be ticked before submitting.'); return; }
     setError('');
     setSubmitting(true);
     const { error: err } = await supabase.from('listings').insert({
