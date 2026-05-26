@@ -1,0 +1,29 @@
+import { createClient } from '@supabase/supabase-js';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { userId, password } = req.body;
+  if (!userId || !password) return res.status(400).json({ error: 'userId and password are required.' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Unauthorised.' });
+
+  const { data: { user }, error: userErr } = await admin.auth.getUser(token);
+  if (userErr || !user) return res.status(401).json({ error: 'Unauthorised.' });
+
+  const { data: callerProfile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+  if (callerProfile?.role !== 'manager') return res.status(403).json({ error: 'Forbidden.' });
+
+  const { error } = await admin.auth.admin.updateUserById(userId, { password });
+  if (error) return res.status(400).json({ error: error.message });
+
+  return res.status(200).json({ success: true });
+}

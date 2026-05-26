@@ -42,6 +42,10 @@ export default function Admin({ profile }) {
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [creating, setCreating] = useState(false);
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetSaving, setResetSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -62,6 +66,24 @@ export default function Admin({ profile }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function handleResetPassword(e) {
+    e.preventDefault();
+    setResetError('');
+    if (resetPassword.length < 8) { setResetError('Password must be at least 8 characters.'); return; }
+    setResetSaving(true);
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` },
+      body: JSON.stringify({ userId: resetTarget.id, password: resetPassword }),
+    });
+    const data = await res.json();
+    setResetSaving(false);
+    if (!res.ok) { setResetError(data.error || 'Failed to reset password.'); return; }
+    setResetTarget(null);
+    setResetPassword('');
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -216,14 +238,14 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Complete', 'Incomplete'].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Complete', 'Incomplete', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                    <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
                   ) : employeeSummary.map(({ emp, count, complete }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{emp.full_name}</td>
@@ -239,6 +261,12 @@ export default function Admin({ profile }) {
                           {count - complete}
                         </span>
                       </td>
+                      <td style={tdStyle}>
+                        <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
+                          background: 'none', border: '1px solid #ddd', borderRadius: 5,
+                          padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
+                        }}>Reset pwd</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -250,6 +278,7 @@ export default function Admin({ profile }) {
                       <td style={{ ...tdStyle, fontSize: 15, color: GREEN }}>{employeeSummary.reduce((s, e) => s + e.count, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
                       <td style={tdStyle}>{employeeSummary.reduce((s, e) => s + (e.count - e.complete), 0)}</td>
+                      <td style={tdStyle}></td>
                     </tr>
                   </tfoot>
                 )}
@@ -355,6 +384,38 @@ export default function Admin({ profile }) {
                 }}>
                   {creating ? 'Creating…' : 'Create'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset password modal */}
+      {resetTarget && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }} onClick={e => e.target === e.currentTarget && setResetTarget(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '28px 28px', width: '100%', maxWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>Reset Password</h2>
+            <p style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>{resetTarget.full_name}</p>
+            <form onSubmit={handleResetPassword}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>New Password</label>
+                <input type="password" required value={resetPassword}
+                  onChange={e => setResetPassword(e.target.value)}
+                  placeholder="Min 8 characters" style={inputStyle} />
+              </div>
+              {resetError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{resetError}</p>}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setResetTarget(null)} style={{
+                  padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                }}>Cancel</button>
+                <button type="submit" disabled={resetSaving} style={{
+                  padding: '8px 18px', borderRadius: 6, border: 'none',
+                  background: resetSaving ? '#aaa' : GREEN, color: '#fff',
+                  cursor: resetSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+                }}>{resetSaving ? 'Saving…' : 'Reset Password'}</button>
               </div>
             </form>
           </div>

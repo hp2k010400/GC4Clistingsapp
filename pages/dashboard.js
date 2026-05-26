@@ -60,6 +60,10 @@ export default function Dashboard({ profile, _debug }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [pwForm, setPwForm] = useState({ newPassword: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     const { data: list } = await supabase
@@ -100,6 +104,20 @@ export default function Dashboard({ profile, _debug }) {
     loadData();
   }
 
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setPwError('');
+    if (pwForm.newPassword.length < 8) { setPwError('Password must be at least 8 characters.'); return; }
+    if (pwForm.newPassword !== pwForm.confirm) { setPwError('Passwords do not match.'); return; }
+    setPwSaving(true);
+    const { error: err } = await supabase.auth.updateUser({ password: pwForm.newPassword });
+    setPwSaving(false);
+    if (err) { setPwError(err.message); return; }
+    setPwForm({ newPassword: '', confirm: '' });
+    setShowChangePw(false);
+    showSuccess('Password updated.');
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/login');
@@ -137,6 +155,10 @@ export default function Dashboard({ profile, _debug }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13 }}>
             <span style={{ opacity: 0.85 }}>{profile.full_name}</span>
+            <button onClick={() => setShowChangePw(true)} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}>Change Password</button>
             <button onClick={handleLogout} style={{
               background: 'rgba(255,255,255,0.15)',
               border: 'none',
@@ -318,6 +340,43 @@ export default function Dashboard({ profile, _debug }) {
 
         </div>
       </div>
+
+      {/* Change password modal */}
+      {showChangePw && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }} onClick={e => e.target === e.currentTarget && setShowChangePw(false)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '28px 28px', width: '100%', maxWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Change Password</h2>
+            <form onSubmit={handleChangePassword}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>New Password</label>
+                <input type="password" required value={pwForm.newPassword}
+                  onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
+                  placeholder="Min 8 characters" style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Confirm Password</label>
+                <input type="password" required value={pwForm.confirm}
+                  onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                  placeholder="Repeat new password" style={inputStyle} />
+              </div>
+              {pwError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{pwError}</p>}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => { setShowChangePw(false); setPwError(''); }} style={{
+                  padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                }}>Cancel</button>
+                <button type="submit" disabled={pwSaving} style={{
+                  padding: '8px 18px', borderRadius: 6, border: 'none',
+                  background: pwSaving ? '#aaa' : GREEN, color: '#fff',
+                  cursor: pwSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+                }}>{pwSaving ? 'Saving…' : 'Update Password'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }
