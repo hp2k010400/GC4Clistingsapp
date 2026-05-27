@@ -92,8 +92,11 @@ export default function Dashboard({ profile, _debug }) {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const [statsToday, setStatsToday] = useState(0);
+  const [statsWeek, setStatsWeek] = useState(0);
+
   const [historyListings, setHistoryListings] = useState([]);
-  const [historyFilter, setHistoryFilter] = useState('week');
+  const [historyFilter, setHistoryFilter] = useState('day');
   const [historySearch, setHistorySearch] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -101,6 +104,19 @@ export default function Dashboard({ profile, _debug }) {
   const [pwForm, setPwForm] = useState({ newPassword: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+
+  const loadStats = useCallback(async () => {
+    const d = new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    const weekStart = d.toISOString().slice(0, 10);
+    const [{ count: tc }, { count: wc }] = await Promise.all([
+      supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).eq('date', today()),
+      supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).gte('date', weekStart),
+    ]);
+    setStatsToday(tc || 0);
+    setStatsWeek(wc || 0);
+  }, [profile.id]);
 
   const loadBatches = useCallback(async () => {
     const { data } = await supabase
@@ -146,7 +162,7 @@ export default function Dashboard({ profile, _debug }) {
     setHistoryLoading(false);
   }, [profile.id, historyFilter]);
 
-  useEffect(() => { loadBatches(); }, [loadBatches]);
+  useEffect(() => { loadBatches(); loadStats(); }, [loadBatches, loadStats]);
   useEffect(() => { if (view === 'history') loadHistory(); }, [view, loadHistory]);
 
   async function handleCreateBatch(e) {
@@ -208,6 +224,7 @@ export default function Dashboard({ profile, _debug }) {
     setSubmitting(false);
     showSuccess('Listing saved!');
     loadBatchListings(activeBatch.id);
+    loadStats();
   }
 
   async function handleDeleteListing(id) {
@@ -271,6 +288,20 @@ export default function Dashboard({ profile, _debug }) {
               {successMsg}
             </div>
           )}
+
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', borderTop: `3px solid ${GREEN}` }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Today</div>
+              <div style={{ fontSize: 30, fontWeight: 900, color: GREEN, lineHeight: 1 }}>{statsToday}</div>
+              <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>listings</div>
+            </div>
+            <div style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', borderTop: '3px solid #bbb' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>This Week</div>
+              <div style={{ fontSize: 30, fontWeight: 900, color: '#1a1a1a', lineHeight: 1 }}>{statsWeek}</div>
+              <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>listings</div>
+            </div>
+          </div>
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
