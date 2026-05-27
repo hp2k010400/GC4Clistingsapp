@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
@@ -6,6 +6,7 @@ import { createAdminClient } from '../lib/supabaseAdmin';
 import { createClient } from '../lib/supabaseClient';
 
 const GREEN = '#005F2C';
+
 const CHECKLIST = [
   { key: 'metafields', label: 'Metafields' },
   { key: 'title', label: 'Title' },
@@ -16,9 +17,14 @@ const CHECKLIST = [
   { key: 'condition', label: 'Condition' },
 ];
 
+const DIFFICULTY = [
+  { key: 'easy',   label: 'Easy',   color: '#28a745', bg: '#d4edda' },
+  { key: 'medium', label: 'Medium', color: '#e67e22', bg: '#fef3e2' },
+  { key: 'hard',   label: 'Hard',   color: '#c0392b', bg: '#fde8e8' },
+];
+
 const EMPTY_FORM = {
   serial_id: '',
-  photos_comments: '',
   metafields: false,
   title: false,
   price: false,
@@ -28,80 +34,165 @@ const EMPTY_FORM = {
   condition: false,
 };
 
+const EMPTY_BATCH = { difficulty: '', comments: '' };
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function formatTime(t) {
-  if (!t) return '—';
-  return t.slice(0, 5);
+function formatTime(isoStr) {
+  if (!isoStr) return '—';
+  return new Date(isoStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function Dashboard({ profile, _debug }) {
+function DiffBadge({ difficulty }) {
+  const d = DIFFICULTY.find(x => x.key === difficulty);
+  if (!d) return null;
+  return (
+    <span style={{
+      background: d.bg, color: d.color, fontWeight: 700, fontSize: 11,
+      padding: '2px 9px', borderRadius: 20, border: `1px solid ${d.color}`,
+      textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap',
+    }}>{d.label}</span>
+  );
+}
+
+export default function MyListings({ profile, _debug }) {
   if (!profile) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6f4' }}>
         <div style={{ textAlign: 'center', padding: 40 }}>
           <p style={{ color: '#c0392b', fontWeight: 600, marginBottom: 12 }}>Account not set up yet — contact your manager.</p>
-          <pre style={{ textAlign: 'left', background: '#eee', padding: 12, borderRadius: 6, fontSize: 11, marginBottom: 12 }}>
-            {JSON.stringify(_debug, null, 2)}
-          </pre>
-          <a href="/login" style={{ color: '#005F2C', fontWeight: 700 }}>Back to login</a>
+          <a href="/login" style={{ color: GREEN, fontWeight: 700 }}>Back to login</a>
         </div>
       </div>
     );
   }
+
   const router = useRouter();
   const supabase = createClient();
+  const photoInputRef = useRef(null);
 
-  const [listings, setListings] = useState([]);
+  const [view, setView] = useState('batches');
+  const [batches, setBatches] = useState([]);
+  const [activeBatch, setActiveBatch] = useState(null);
+  const [batchListings, setBatchListings] = useState([]);
+  const [showBatchForm, setShowBatchForm] = useState(false);
+  const [batchForm, setBatchForm] = useState(EMPTY_BATCH);
+  const [batchPhotoFiles, setBatchPhotoFiles] = useState([]);
+  const [batchCreating, setBatchCreating] = useState(false);
+  const [batchError, setBatchError] = useState('');
+
   const [form, setForm] = useState(EMPTY_FORM);
   const [listedAt, setListedAt] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const [historyListings, setHistoryListings] = useState([]);
+  const [historyFilter, setHistoryFilter] = useState('week');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const [showChangePw, setShowChangePw] = useState(false);
   const [pwForm, setPwForm] = useState({ newPassword: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
 
-  const loadData = useCallback(async () => {
-    const { data: list } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('user_id', profile.id)
-      .eq('date', today())
+  const loadBatches = useCallback(async () => {
+    const { data } = await supabase
+      .from('batches').select('*').eq('user_id', profile.id).eq('date', today())
       .order('created_at', { ascending: false });
-    setListings(list || []);
+    setBatches(data || []);
   }, [profile.id]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const loadBatchListings = useCallback(async (batchId) => {
+    const { data } = await supabase
+      .from('listings').select('*').eq('batch_id', batchId)
+      .order('created_at', { ascending: false });
+    setBatchListings(data || []);
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    const now = new Date();
+    let from = null;
+    if (historyFilter === 'day') {
+      from = today();
+    } else if (historyFilter === 'week') {
+      const d = new Date();
+      const day = d.getDay();
+      d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      from = d.toISOString().slice(0, 10);
+    } else if (historyFilter === 'month') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    }
+    let query = supabase.from('listings').select('*, batches(difficulty, comments)').eq('user_id', profile.id).order('created_at', { ascending: false });
+    if (from) query = query.gte('date', from);
+    const { data } = await query;
+    setHistoryListings(data || []);
+    setHistoryLoading(false);
+  }, [profile.id, historyFilter]);
+
+  useEffect(() => { loadBatches(); }, [loadBatches]);
+  useEffect(() => { if (view === 'history') loadHistory(); }, [view, loadHistory]);
+
+  async function handleCreateBatch(e) {
+    e.preventDefault();
+    setBatchError('');
+    if (!batchForm.difficulty) { setBatchError('Please select a difficulty.'); return; }
+    setBatchCreating(true);
+    const ts = Date.now();
+    const photo_urls = [];
+    for (let i = 0; i < batchPhotoFiles.length; i++) {
+      const file = batchPhotoFiles[i];
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${profile.id}/${ts}_${i}_${safeName}`;
+      const { error: uploadErr } = await supabase.storage.from('batch-photos').upload(path, file);
+      if (!uploadErr) {
+        const { data: { publicUrl } } = supabase.storage.from('batch-photos').getPublicUrl(path);
+        photo_urls.push(publicUrl);
+      }
+    }
+    const { data: batch, error: err } = await supabase.from('batches').insert({
+      user_id: profile.id, date: today(), difficulty: batchForm.difficulty,
+      comments: batchForm.comments.trim() || null,
+      photo_urls: photo_urls.length > 0 ? photo_urls : null,
+    }).select().single();
+    setBatchCreating(false);
+    if (err) { setBatchError('Failed to create batch. Try again.'); return; }
+    setBatchForm(EMPTY_BATCH);
+    setBatchPhotoFiles([]);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+    setShowBatchForm(false);
+    setActiveBatch(batch);
+    setBatchListings([]);
+    setView('batch-detail');
+    loadBatches();
+  }
 
   async function handleListingSubmit(e) {
     e.preventDefault();
     if (!form.serial_id.trim()) { setError('Serial ID is required.'); return; }
-    const allTicked = CHECKLIST.every(c => form[c.key]);
-    if (!allTicked) { setError('All checklist items must be ticked before submitting.'); return; }
+    if (!CHECKLIST.every(c => form[c.key])) { setError('All checklist items must be ticked before submitting.'); return; }
     setError('');
     setSubmitting(true);
     const { error: err } = await supabase.from('listings').insert({
-      user_id: profile.id,
-      date: today(),
-      ...form,
-      serial_id: form.serial_id.trim(),
+      user_id: profile.id, date: today(), batch_id: activeBatch.id,
+      ...form, serial_id: form.serial_id.trim(),
     });
     if (err) { setError('Failed to save listing. Try again.'); setSubmitting(false); return; }
     setForm(EMPTY_FORM);
     setListedAt(null);
     setSubmitting(false);
     showSuccess('Listing saved!');
-    loadData();
+    loadBatchListings(activeBatch.id);
   }
 
-  async function handleDelete(id) {
+  async function handleDeleteListing(id) {
     if (!confirm('Remove this listing?')) return;
     await supabase.from('listings').delete().eq('id', id);
-    loadData();
+    loadBatchListings(activeBatch.id);
   }
 
   async function handleChangePassword(e) {
@@ -128,25 +219,16 @@ export default function Dashboard({ profile, _debug }) {
     setTimeout(() => setSuccessMsg(''), 2500);
   }
 
-  function allChecked(listing) {
-    return CHECKLIST.every(c => listing[c.key]);
-  }
+  const filteredHistory = historyListings.filter(l =>
+    !historySearch || l.serial_id.toLowerCase().includes(historySearch.toLowerCase())
+  );
 
   return (
     <>
-      <Head><title>GC4C Listings — Dashboard</title></Head>
+      <Head><title>GC4C Listings — My Listings</title></Head>
       <div style={{ minHeight: '100vh', background: '#f4f6f4' }}>
 
-        {/* Top bar */}
-        <div style={{
-          background: GREEN,
-          color: '#fff',
-          padding: '0 24px',
-          height: 52,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
+        <div style={{ background: GREEN, color: '#fff', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '0.05em' }}>GC4C Listings</span>
             <span style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>
@@ -156,228 +238,191 @@ export default function Dashboard({ profile, _debug }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13 }}>
             <span style={{ opacity: 0.85 }}>{profile.full_name}</span>
             {profile.role === 'manager' && (
-              <button onClick={() => router.push('/admin')} style={{
-                background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
-                padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              }}>← Manager View</button>
+              <button onClick={() => router.push('/admin')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>← Manager View</button>
             )}
-            <button onClick={() => setShowChangePw(true)} style={{
-              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
-              padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            }}>Change Password</button>
-            <button onClick={handleLogout} style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              color: '#fff',
-              padding: '4px 12px',
-              borderRadius: 5,
-              cursor: 'pointer',
-              fontSize: 12,
-              fontWeight: 600,
-            }}>Sign out</button>
+            <button onClick={() => setShowChangePw(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Change Password</button>
+            <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Sign out</button>
           </div>
         </div>
 
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px' }}>
 
           {successMsg && (
-            <div style={{
-              background: '#d4edda',
-              color: '#155724',
-              border: '1px solid #c3e6cb',
-              borderRadius: 7,
-              padding: '10px 14px',
-              marginBottom: 16,
-              fontSize: 13,
-              fontWeight: 600,
-            }}>{successMsg}</div>
+            <div style={{ background: '#d4edda', color: '#155724', border: '1px solid #c3e6cb', borderRadius: 7, padding: '10px 14px', marginBottom: 16, fontSize: 13, fontWeight: 600 }}>{successMsg}</div>
           )}
 
-          {/* Add listing form */}
-          <div style={cardStyle}>
-            <h2 style={cardTitleStyle}>Log a Listing</h2>
-            <form onSubmit={handleListingSubmit}>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
-                <div style={{ flex: '0 0 180px' }}>
-                  <label style={labelStyle}>Serial ID *</label>
-                  <input
-                    type="text"
-                    value={form.serial_id}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setForm(f => ({ ...f, serial_id: val }));
-                      if (val && !form.serial_id) setListedAt(new Date());
-                      if (!val) setListedAt(null);
-                    }}
-                    style={inputStyle}
-                    placeholder="e.g. GC-12345"
-                  />
-                </div>
-                {listedAt && (
-                  <div style={{ flex: '0 0 auto' }}>
-                    <label style={labelStyle}>Date / Time</label>
-                    <input
-                      readOnly
-                      value={`${listedAt.toLocaleDateString('en-GB')}  ${listedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}
-                      style={{ ...inputStyle, width: 160, background: '#f0f7f0', color: '#444', cursor: 'default' }}
-                    />
-                  </div>
-                )}
-                <div style={{ flex: '1 1 260px' }}>
-                  <label style={labelStyle}>Photos / Comments</label>
-                  <input
-                    type="text"
-                    value={form.photos_comments}
-                    onChange={e => setForm(f => ({ ...f, photos_comments: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Optional notes"
-                  />
-                </div>
-              </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <button onClick={() => { setView('batches'); setActiveBatch(null); }} style={{ padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: view !== 'history' ? GREEN : '#e8eee8', color: view !== 'history' ? '#fff' : '#444' }}>Batches</button>
+            <button onClick={() => setView('history')} style={{ padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: view === 'history' ? GREEN : '#e8eee8', color: view === 'history' ? '#fff' : '#444' }}>My History</button>
+          </div>
 
-              <div style={{ marginTop: 16 }}>
-                <label style={labelStyle}>Checklist</label>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-                  {CHECKLIST.map(({ key, label }) => (
-                    <label key={key} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      background: form[key] ? '#e8f5ee' : '#f5f5f5',
-                      border: `1.5px solid ${form[key] ? GREEN : '#d0d0d0'}`,
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      userSelect: 'none',
-                      transition: 'all 0.1s',
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={form[key]}
-                        onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
-                        style={{ accentColor: GREEN, width: 15, height: 15 }}
-                      />
-                      {label}
-                    </label>
+          {view === 'batches' && (
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h2 style={cardTitleStyle}>Today's Batches <span style={{ marginLeft: 10, background: GREEN, color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 13, fontWeight: 700 }}>{batches.length}</span></h2>
+                <button onClick={() => { setBatchForm(EMPTY_BATCH); setBatchError(''); setBatchPhotoFiles([]); setShowBatchForm(true); }} style={btnStyle}>+ New Batch</button>
+              </div>
+              {batches.length === 0 ? (
+                <p style={{ color: '#999', fontSize: 13 }}>No batches started today. Hit "+ New Batch" to begin.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {batches.map(batch => (
+                    <button key={batch.id} onClick={() => { setActiveBatch(batch); loadBatchListings(batch.id); setView('batch-detail'); }} style={{ background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 8, padding: '12px 16px', cursor: 'pointer', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <DiffBadge difficulty={batch.difficulty} />
+                      <span style={{ fontSize: 13, color: '#555', flex: 1 }}>{batch.comments || <em style={{ color: '#bbb' }}>No comments</em>}</span>
+                      {batch.photo_urls?.length > 0 && <span style={{ fontSize: 12, color: '#888' }}>📷 {batch.photo_urls.length}</span>}
+                      <span style={{ fontSize: 12, color: '#bbb' }}>{formatTime(batch.created_at)}</span>
+                      <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>Open →</span>
+                    </button>
                   ))}
                 </div>
-              </div>
-
-              {error && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 10 }}>{error}</p>}
-
-              <button type="submit" disabled={submitting} style={{ ...btnStyle, marginTop: 16 }}>
-                {submitting ? 'Saving…' : '+ Add Listing'}
-              </button>
-            </form>
-          </div>
-
-          {/* Today's listings */}
-          <div style={cardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 style={{ ...cardTitleStyle, marginBottom: 0 }}>
-                Today's Listings
-                <span style={{
-                  marginLeft: 10,
-                  background: GREEN,
-                  color: '#fff',
-                  borderRadius: 20,
-                  padding: '2px 10px',
-                  fontSize: 13,
-                  fontWeight: 700,
-                }}>{listings.length}</span>
-              </h2>
+              )}
             </div>
+          )}
 
-            {listings.length === 0 ? (
-              <p style={{ color: '#999', fontSize: 13 }}>No listings logged yet today.</p>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: '#f0f4f0' }}>
-                      <th style={thStyle}>Time</th>
-                      <th style={thStyle}>Serial ID</th>
-                      {CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}
-                      <th style={thStyle}>Comments</th>
-                      <th style={thStyle}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {listings.map((l, i) => (
-                      <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
-                        <td style={tdStyle}>{formatTime(new Date(l.created_at).toTimeString())}</td>
-                        <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
-                        {CHECKLIST.map(c => (
-                          <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>
-                            {l[c.key]
-                              ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span>
-                              : <span style={{ color: '#ccc' }}>–</span>}
-                          </td>
+          {view === 'batch-detail' && activeBatch && (
+            <>
+              <div style={{ ...cardStyle, borderLeft: `4px solid ${DIFFICULTY.find(d => d.key === activeBatch.difficulty)?.color || GREEN}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button onClick={() => { setView('batches'); setActiveBatch(null); setForm(EMPTY_FORM); setError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 13, padding: 0, fontWeight: 600 }}>← Batches</button>
+                  <DiffBadge difficulty={activeBatch.difficulty} />
+                  {activeBatch.comments && <span style={{ fontSize: 13, color: '#555' }}>{activeBatch.comments}</span>}
+                  {activeBatch.photo_urls?.length > 0 && <span style={{ fontSize: 12, color: '#888' }}>📷 {activeBatch.photo_urls.length} photo{activeBatch.photo_urls.length !== 1 ? 's' : ''}</span>}
+                  <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: '#555' }}>{batchListings.length} listing{batchListings.length !== 1 ? 's' : ''} in this batch</span>
+                </div>
+              </div>
+
+              <div style={cardStyle}>
+                <h2 style={cardTitleStyle}>Add Listing</h2>
+                <form onSubmit={handleListingSubmit}>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
+                    <div style={{ flex: '0 0 180px' }}>
+                      <label style={labelStyle}>Serial ID *</label>
+                      <input type="text" value={form.serial_id} onChange={e => { const val = e.target.value; setForm(f => ({ ...f, serial_id: val })); if (val && !form.serial_id) setListedAt(new Date()); if (!val) setListedAt(null); }} style={inputStyle} placeholder="e.g. GC-12345" autoFocus />
+                    </div>
+                    {listedAt && (
+                      <div style={{ flex: '0 0 auto' }}>
+                        <label style={labelStyle}>Date / Time</label>
+                        <input readOnly value={`${listedAt.toLocaleDateString('en-GB')}  ${listedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`} style={{ ...inputStyle, width: 160, background: '#f0f7f0', color: '#444', cursor: 'default' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 16 }}>
+                    <label style={labelStyle}>Checklist</label>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+                      {CHECKLIST.map(({ key, label }) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, background: form[key] ? '#e8f5ee' : '#f5f5f5', border: `1.5px solid ${form[key] ? GREEN : '#d0d0d0'}`, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600, userSelect: 'none', transition: 'all 0.1s' }}>
+                          <input type="checkbox" checked={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))} style={{ accentColor: GREEN, width: 15, height: 15 }} />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {error && <p style={{ color: '#c0392b', fontSize: 13, marginTop: 10 }}>{error}</p>}
+                  <button type="submit" disabled={submitting} style={{ ...btnStyle, marginTop: 16 }}>{submitting ? 'Saving…' : '+ Add Listing'}</button>
+                </form>
+              </div>
+
+              <div style={cardStyle}>
+                <h2 style={{ ...cardTitleStyle, marginBottom: 14 }}>Listings in this Batch</h2>
+                {batchListings.length === 0 ? <p style={{ color: '#999', fontSize: 13 }}>No listings added yet.</p> : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead><tr style={{ background: '#f0f4f0' }}><th style={thStyle}>Time</th><th style={thStyle}>Serial ID</th>{CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}<th style={thStyle}></th></tr></thead>
+                      <tbody>
+                        {batchListings.map((l, i) => (
+                          <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
+                            <td style={tdStyle}>{formatTime(l.created_at)}</td>
+                            <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                            {CHECKLIST.map(c => <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>{l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}</td>)}
+                            <td style={tdStyle}><button onClick={() => handleDeleteListing(l.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 16, padding: '0 4px' }} title="Remove">×</button></td>
+                          </tr>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {l.photos_comments || ''}
-                        </td>
-                        <td style={tdStyle}>
-                          <button onClick={() => handleDelete(l.id)} style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#ccc',
-                            cursor: 'pointer',
-                            fontSize: 16,
-                            padding: '0 4px',
-                          }} title="Remove">×</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
+            </>
+          )}
 
-            {listings.length > 0 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: '#555' }}>
-                Complete: {listings.filter(allChecked).length} / {listings.length} &nbsp;·&nbsp;
-                Incomplete: {listings.filter(l => !allChecked(l)).length}
+          {view === 'history' && (
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[{ key: 'day', label: 'Today' }, { key: 'week', label: 'This Week' }, { key: 'month', label: 'This Month' }, { key: 'all', label: 'All Time' }].map(f => (
+                    <button key={f.key} onClick={() => setHistoryFilter(f.key)} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: historyFilter === f.key ? GREEN : '#f0f4f0', color: historyFilter === f.key ? '#fff' : '#444' }}>{f.label}</button>
+                  ))}
+                </div>
+                <input type="text" placeholder="Search Serial ID…" value={historySearch} onChange={e => setHistorySearch(e.target.value)} style={{ ...inputStyle, width: 180 }} />
+                <span style={{ fontSize: 13, color: '#888' }}>{filteredHistory.length} listing{filteredHistory.length !== 1 ? 's' : ''}</span>
               </div>
-            )}
-          </div>
-
+              {historyLoading ? <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading…</p> : filteredHistory.length === 0 ? <p style={{ color: '#999', fontSize: 13 }}>No listings found.</p> : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead><tr style={{ background: '#f0f4f0' }}><th style={thStyle}>Date</th><th style={thStyle}>Time</th><th style={thStyle}>Serial ID</th><th style={thStyle}>Batch</th>{CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}</tr></thead>
+                    <tbody>
+                      {filteredHistory.map((l, i) => (
+                        <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
+                          <td style={tdStyle}>{new Date(l.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
+                          <td style={tdStyle}>{formatTime(l.created_at)}</td>
+                          <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                          <td style={tdStyle}>{l.batches ? <DiffBadge difficulty={l.batches.difficulty} /> : '—'}</td>
+                          {CHECKLIST.map(c => <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>{l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Change password modal */}
+      {showBatchForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={e => e.target === e.currentTarget && setShowBatchForm(false)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '28px', width: '100%', maxWidth: 440, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Start New Batch</h2>
+            <form onSubmit={handleCreateBatch}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Difficulty *</label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  {DIFFICULTY.map(d => (
+                    <button key={d.key} type="button" onClick={() => setBatchForm(f => ({ ...f, difficulty: d.key }))} style={{ flex: 1, padding: '10px 0', borderRadius: 7, cursor: 'pointer', fontWeight: 700, fontSize: 13, border: `2px solid ${batchForm.difficulty === d.key ? d.color : '#e0e0e0'}`, background: batchForm.difficulty === d.key ? d.bg : '#fff', color: batchForm.difficulty === d.key ? d.color : '#888', transition: 'all 0.1s' }}>{d.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Comments</label>
+                <textarea value={batchForm.comments} onChange={e => setBatchForm(f => ({ ...f, comments: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} placeholder="e.g. Titleist bag, mixed irons, some rust…" />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Photos</label>
+                <input ref={photoInputRef} type="file" multiple accept="image/*" onChange={e => setBatchPhotoFiles(Array.from(e.target.files))} style={{ fontSize: 13, width: '100%' }} />
+                {batchPhotoFiles.length > 0 && <p style={{ fontSize: 12, color: '#555', marginTop: 4 }}>{batchPhotoFiles.length} photo{batchPhotoFiles.length !== 1 ? 's' : ''} selected</p>}
+              </div>
+              {batchError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{batchError}</p>}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowBatchForm(false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={batchCreating} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: batchCreating ? '#aaa' : GREEN, color: '#fff', cursor: batchCreating ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>{batchCreating ? 'Creating…' : 'Start Batch'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showChangePw && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }} onClick={e => e.target === e.currentTarget && setShowChangePw(false)}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '28px 28px', width: '100%', maxWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={e => e.target === e.currentTarget && setShowChangePw(false)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '28px', width: '100%', maxWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
             <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Change Password</h2>
             <form onSubmit={handleChangePassword}>
-              <div style={{ marginBottom: 14 }}>
-                <label style={labelStyle}>New Password</label>
-                <input type="password" required value={pwForm.newPassword}
-                  onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
-                  placeholder="Min 8 characters" style={inputStyle} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={labelStyle}>Confirm Password</label>
-                <input type="password" required value={pwForm.confirm}
-                  onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
-                  placeholder="Repeat new password" style={inputStyle} />
-              </div>
+              <div style={{ marginBottom: 14 }}><label style={labelStyle}>New Password</label><input type="password" required value={pwForm.newPassword} onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))} placeholder="Min 8 characters" style={inputStyle} /></div>
+              <div style={{ marginBottom: 14 }}><label style={labelStyle}>Confirm Password</label><input type="password" required value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} placeholder="Repeat new password" style={inputStyle} /></div>
               {pwError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{pwError}</p>}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => { setShowChangePw(false); setPwError(''); }} style={{
-                  padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                }}>Cancel</button>
-                <button type="submit" disabled={pwSaving} style={{
-                  padding: '8px 18px', borderRadius: 6, border: 'none',
-                  background: pwSaving ? '#aaa' : GREEN, color: '#fff',
-                  cursor: pwSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
-                }}>{pwSaving ? 'Saving…' : 'Update Password'}</button>
+                <button type="button" onClick={() => { setShowChangePw(false); setPwError(''); }} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={pwSaving} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: pwSaving ? '#aaa' : GREEN, color: '#fff', cursor: pwSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>{pwSaving ? 'Saving…' : 'Update Password'}</button>
               </div>
             </form>
           </div>
@@ -387,86 +432,24 @@ export default function Dashboard({ profile, _debug }) {
   );
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: 10,
-  boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
-  padding: '18px 20px',
-  marginBottom: 16,
-};
-const cardTitleStyle = {
-  fontSize: 15,
-  fontWeight: 700,
-  color: '#1a1a1a',
-  marginBottom: 0,
-};
-const labelStyle = {
-  display: 'block',
-  fontSize: 12,
-  fontWeight: 600,
-  color: '#555',
-  marginBottom: 4,
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-};
-const inputStyle = {
-  width: '100%',
-  padding: '8px 10px',
-  border: '1px solid #d0d0d0',
-  borderRadius: 6,
-  fontSize: 14,
-  outline: 'none',
-  background: '#fafafa',
-};
-const btnStyle = {
-  background: GREEN,
-  color: '#fff',
-  border: 'none',
-  borderRadius: 7,
-  padding: '9px 18px',
-  fontWeight: 700,
-  fontSize: 13,
-  cursor: 'pointer',
-  letterSpacing: '0.03em',
-};
-const thStyle = {
-  textAlign: 'left',
-  padding: '8px 10px',
-  fontWeight: 700,
-  fontSize: 12,
-  color: '#444',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  whiteSpace: 'nowrap',
-};
-const tdStyle = {
-  padding: '8px 10px',
-  verticalAlign: 'middle',
-};
+const cardStyle = { background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', padding: '18px 20px', marginBottom: 16 };
+const cardTitleStyle = { fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 0 };
+const labelStyle = { display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' };
+const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid #d0d0d0', borderRadius: 6, fontSize: 14, outline: 'none', background: '#fafafa' };
+const btnStyle = { background: GREEN, color: '#fff', border: 'none', borderRadius: 7, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', letterSpacing: '0.03em' };
+const thStyle = { textAlign: 'left', padding: '8px 10px', fontWeight: 700, fontSize: 12, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' };
+const tdStyle = { padding: '8px 10px', verticalAlign: 'middle' };
 
 export async function getServerSideProps({ req, res }) {
   const supabase = createServerSupabaseClient(req, res);
   const { data: { session } } = await supabase.auth.getSession();
-
   if (!session) return { redirect: { destination: '/login', permanent: false } };
-
   const admin = createAdminClient();
-  const { data: profile, error: profileError } = await admin
-    .from('profiles')
-    .select('*')
-    .eq('id', session.user.id)
-    .single();
-
-  // managers are allowed on this page too
-
+  const { data: profile, error: profileError } = await admin.from('profiles').select('*').eq('id', session.user.id).single();
   return {
     props: {
       profile: profile || null,
-      _debug: {
-        userId: session.user.id,
-        profileError: profileError?.message || null,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      },
+      _debug: { userId: session.user.id, profileError: profileError?.message || null },
     },
   };
 }

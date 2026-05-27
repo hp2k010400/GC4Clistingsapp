@@ -78,6 +78,35 @@ create policy "Employee listings" on public.listings
   for all using (auth.uid() = user_id or public.is_manager());
 
 -- ============================================================
+-- Batches (one per bag of clubs)
+-- ============================================================
+
+create table public.batches (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  date       date not null default current_date,
+  difficulty text check (difficulty in ('easy', 'medium', 'hard')),
+  comments   text,
+  photo_urls text[],
+  created_at timestamptz not null default now()
+);
+
+alter table public.batches enable row level security;
+
+create policy "Employee batches"
+  on public.batches for all
+  using (auth.uid() = user_id or public.is_manager())
+  with check (auth.uid() = user_id);
+
+grant all on public.batches to anon, authenticated, service_role;
+create index on public.batches (user_id, date);
+
+-- Add batch_id and serial_id_checked to listings
+alter table public.listings
+  add column if not exists batch_id uuid references public.batches(id) on delete set null,
+  add column if not exists serial_id_checked boolean not null default false;
+
+-- ============================================================
 -- Your first manager account
 -- ============================================================
 -- After creating your own Supabase Auth user (via the Auth tab),

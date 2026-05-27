@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
@@ -6,6 +6,24 @@ import { createAdminClient } from '../lib/supabaseAdmin';
 import { createClient } from '../lib/supabaseClient';
 
 const GREEN = '#005F2C';
+
+const DIFFICULTY = [
+  { key: 'easy',   label: 'Easy',   color: '#28a745', bg: '#d4edda' },
+  { key: 'medium', label: 'Medium', color: '#e67e22', bg: '#fef3e2' },
+  { key: 'hard',   label: 'Hard',   color: '#c0392b', bg: '#fde8e8' },
+];
+
+function DiffBadge({ difficulty }) {
+  const d = DIFFICULTY.find(x => x.key === difficulty);
+  if (!d) return <span style={{ color: '#ccc', fontSize: 11 }}>—</span>;
+  return (
+    <span style={{
+      background: d.bg, color: d.color, fontWeight: 700, fontSize: 11,
+      padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+    }}>{d.label}</span>
+  );
+}
+
 const LOCATIONS = ['All Locations', 'Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
 const CHECKLIST = ['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'];
 
@@ -70,7 +88,7 @@ export default function Admin({ profile }) {
     const [{ data: allListings }, { data: allEmployees }] = await Promise.all([
       supabase
         .from('listings')
-        .select('*, profiles(full_name, location)')
+        .select('*, profiles(full_name, location), batches(difficulty, comments, photo_urls)')
         .gte('date', weekStart)
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('*').order('full_name'),
@@ -151,11 +169,12 @@ export default function Admin({ profile }) {
   }
 
   function exportListings() {
-    const headers = ['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Notes', 'Manager Note'];
+    const headers = ['Time', 'Employee', 'Location', 'Batch Difficulty', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Batch Comments', 'Manager Note'];
     const rows = filteredListings.map(l => [
       formatTime(l.created_at),
       l.profiles?.full_name,
       l.profiles?.location,
+      l.batches?.difficulty || '',
       l.serial_id,
       l.metafields ? 'Yes' : 'No',
       l.title ? 'Yes' : 'No',
@@ -164,7 +183,7 @@ export default function Admin({ profile }) {
       l.specifications ? 'Yes' : 'No',
       l.serial_id_checked ? 'Yes' : 'No',
       l.condition ? 'Yes' : 'No',
-      l.photos_comments || '',
+      l.batches?.comments || '',
       l.manager_comment || '',
     ]);
     downloadCSV(`gc4c-listings-${date}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
@@ -385,19 +404,20 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Notes', 'Photos', 'Manager Note'].map(h => (
+                      {['Time', 'Employee', 'Location', 'Batch', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Batch Comments', 'Photos', 'Manager Note'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredListings.length === 0 ? (
-                      <tr><td colSpan={14} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
+                      <tr><td colSpan={15} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
                     ) : filteredListings.map((l, i) => (
                       <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                         <td style={tdStyle}>{formatTime(l.created_at)}</td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.profiles?.full_name}</td>
                         <td style={tdStyle}>{l.profiles?.location}</td>
+                        <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
                         {CHECKLIST.map(c => (
                           <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
@@ -406,13 +426,13 @@ export default function Admin({ profile }) {
                               : <span style={{ color: '#ddd' }}>–</span>}
                           </td>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {l.photos_comments || ''}
+                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.batches?.comments || ''}
                         </td>
                         <td style={tdStyle}>
-                          {l.photo_urls?.length > 0 ? (
+                          {l.batches?.photo_urls?.length > 0 ? (
                             <div style={{ display: 'flex', gap: 3 }}>
-                              {l.photo_urls.map((url, idx) => (
+                              {l.batches.photo_urls.map((url, idx) => (
                                 <a key={idx} href={url} target="_blank" rel="noreferrer">
                                   <img src={url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, border: '1px solid #ddd' }} />
                                 </a>
@@ -599,35 +619,71 @@ export default function Admin({ profile }) {
               <div style={{ overflowY: 'auto', overflowX: 'auto' }}>
                 {empListings.length === 0 ? (
                   <p style={{ padding: 24, color: '#999', textAlign: 'center', fontSize: 13 }}>No listings for this date.</p>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#f0f4f0' }}>
-                        {['Time', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photos', 'Specs', 'Serial ✓', 'Condition', 'Notes'].map(h => (
-                          <th key={h} style={thStyle}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {empListings.map((l, i) => (
-                        <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
-                          <td style={tdStyle}>{formatTime(l.created_at)}</td>
-                          <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
-                          {['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'].map(c => (
-                            <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
-                              {l[c]
-                                ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span>
-                                : <span style={{ color: '#ddd' }}>–</span>}
-                            </td>
+                ) : (() => {
+                  const groupMap = {};
+                  const groups = [];
+                  for (const l of empListings) {
+                    const bid = l.batch_id || '__none';
+                    if (!groupMap[bid]) {
+                      groupMap[bid] = { bid, batch: l.batches, items: [] };
+                      groups.push(groupMap[bid]);
+                    }
+                    groupMap[bid].items.push(l);
+                  }
+                  return (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f0f4f0' }}>
+                          {['Time', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Notes'].map(h => (
+                            <th key={h} style={thStyle}>{h}</th>
                           ))}
-                          <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {l.photos_comments || ''}
-                          </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      </thead>
+                      <tbody>
+                        {groups.map(({ bid, batch, items }) => (
+                          <React.Fragment key={bid}>
+                            {batch && (
+                              <tr style={{ background: '#f8f9fa', borderTop: '2px solid #e0e0e0' }}>
+                                <td colSpan={10} style={{ padding: '7px 12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <DiffBadge difficulty={batch.difficulty} />
+                                    {batch.comments && <span style={{ fontSize: 12, color: '#555' }}>{batch.comments}</span>}
+                                    {batch.photo_urls?.length > 0 && (
+                                      <div style={{ display: 'flex', gap: 3, marginLeft: 4 }}>
+                                        {batch.photo_urls.map((url, idx) => (
+                                          <a key={idx} href={url} target="_blank" rel="noreferrer">
+                                            <img src={url} alt="" style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: 3, border: '1px solid #ddd' }} />
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <span style={{ fontSize: 11, color: '#999', marginLeft: 'auto' }}>{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            {items.map((l, i) => (
+                              <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
+                                <td style={tdStyle}>{formatTime(l.created_at)}</td>
+                                <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                                {['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'].map(c => (
+                                  <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {l[c]
+                                      ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span>
+                                      : <span style={{ color: '#ddd' }}>–</span>}
+                                  </td>
+                                ))}
+                                <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {l.photos_comments || ''}
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
               </div>
             </div>
           </div>
