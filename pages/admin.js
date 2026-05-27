@@ -65,6 +65,9 @@ export default function Admin({ profile }) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [listingsPeriod, setListingsPeriod] = useState('week');
+  const [listingsEmployee, setListingsEmployee] = useState('');
+  const [listingsSearch, setListingsSearch] = useState('');
 
   // Create user modal
   const [showCreate, setShowCreate] = useState(false);
@@ -84,20 +87,28 @@ export default function Admin({ profile }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     const weekStart = getWeekStart();
+    let fromDate = weekStart;
+    if (listingsPeriod === 'month') {
+      const d = new Date();
+      fromDate = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    } else if (listingsPeriod === 'all') {
+      fromDate = null;
+    }
+    let q = supabase
+      .from('listings')
+      .select('*, profiles(full_name, location), batches(difficulty, comments, photo_urls)')
+      .order('created_at', { ascending: false });
+    if (fromDate) q = q.gte('date', fromDate);
 
     const [{ data: allListings }, { data: allEmployees }] = await Promise.all([
-      supabase
-        .from('listings')
-        .select('*, profiles(full_name, location), batches(difficulty, comments, photo_urls)')
-        .gte('date', weekStart)
-        .order('created_at', { ascending: false }),
+      q,
       supabase.from('profiles').select('*').order('full_name'),
     ]);
 
     setListings(allListings || []);
     setEmployees(allEmployees || []);
     setLoading(false);
-  }, []);
+  }, [listingsPeriod]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -169,8 +180,9 @@ export default function Admin({ profile }) {
   }
 
   function exportListings() {
-    const headers = ['Time', 'Employee', 'Location', 'Batch Difficulty', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Batch Comments', 'Manager Note'];
+    const headers = ['Date', 'Time', 'Employee', 'Location', 'Batch Difficulty', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Batch Comments', 'Manager Note'];
     const rows = filteredListings.map(l => [
+      l.date,
       formatTime(l.created_at),
       l.profiles?.full_name,
       l.profiles?.location,
@@ -186,26 +198,39 @@ export default function Admin({ profile }) {
       l.batches?.comments || '',
       l.manager_comment || '',
     ]);
-    downloadCSV(`gc4c-listings-${date}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
+    downloadCSV(`gc4c-listings-${listingsPeriod}-${today()}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
   }
 
-  // Filtered listings for selected date + location
+  const todayStr = today();
+  const weekStart = getWeekStart();
+
+  // For All Listings tab — period + location + employee + search
   const filteredListings = listings.filter(l => {
+    if (listingsPeriod === 'day' && l.date !== todayStr) return false;
+    if (listingsPeriod === 'week' && l.date < weekStart) return false;
+    if (location !== 'All Locations' && l.profiles?.location !== location) return false;
+    if (listingsEmployee && l.user_id !== listingsEmployee) return false;
+    if (listingsSearch && !l.serial_id.toLowerCase().includes(listingsSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  // For Employee Overview tab — exact date + location
+  const overviewListings = listings.filter(l => {
     if (l.date !== date) return false;
     if (location !== 'All Locations' && l.profiles?.location !== location) return false;
     return true;
   });
 
-  // Location summary cards (today vs this week)
+  // Location summary cards (always today vs this week from loaded data)
   const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'].map(loc => {
-    const todayCount = listings.filter(l => l.date === today() && l.profiles?.location === loc).length;
-    const weekCount = listings.filter(l => l.profiles?.location === loc).length;
+    const todayCount = listings.filter(l => l.date === todayStr && l.profiles?.location === loc).length;
+    const weekCount = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc).length;
     return { loc, todayCount, weekCount };
   });
 
   // Employee summary for selected date
   const employeeSummary = employees.map(emp => {
-    const empListings = filteredListings.filter(l => l.user_id === emp.id);
+    const empListings = overviewListings.filter(l => l.user_id === emp.id);
     const complete = empListings.filter(l => CHECKLIST.every(c => l[c])).length;
     return { emp, count: empListings.length, complete };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
@@ -309,12 +334,41 @@ export default function Admin({ profile }) {
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 12, marginLeft: 'auto', alignItems: 'center' }}>
-              <div>
-                <label style={labelStyle}>Date</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  style={{ ...inputStyle, width: 150 }} />
-              </div>
+            <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
+              {activeTab === 'listings' ? (
+                <>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[
+                      { key: 'day', label: 'Today' },
+                      { key: 'week', label: 'This Week' },
+                      { key: 'month', label: 'This Month' },
+                      { key: 'all', label: 'All Time' },
+                    ].map(p => (
+                      <button key={p.key} onClick={() => setListingsPeriod(p.key)} style={{
+                        padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                        fontWeight: 700, fontSize: 12,
+                        background: listingsPeriod === p.key ? GREEN : '#f0f4f0',
+                        color: listingsPeriod === p.key ? '#fff' : '#444',
+                      }}>{p.label}</button>
+                    ))}
+                  </div>
+                  <select value={listingsEmployee} onChange={e => setListingsEmployee(e.target.value)} style={{ ...inputStyle, width: 160 }}>
+                    <option value="">All Employees</option>
+                    {employees.filter(e => location === 'All Locations' || e.location === location).map(e => (
+                      <option key={e.id} value={e.id}>{e.full_name}</option>
+                    ))}
+                  </select>
+                  <input type="text" placeholder="Search Serial ID…" value={listingsSearch}
+                    onChange={e => setListingsSearch(e.target.value)}
+                    style={{ ...inputStyle, width: 160 }} />
+                </>
+              ) : (
+                <div>
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                    style={{ ...inputStyle, width: 150 }} />
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Location</label>
                 <select value={location} onChange={e => setLocation(e.target.value)} style={{ ...inputStyle, width: 170 }}>
@@ -396,7 +450,9 @@ export default function Admin({ profile }) {
               <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>
                   {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
-                  {location !== 'All Locations' ? ` — ${location}` : ''} on {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {location !== 'All Locations' ? ` — ${location}` : ''}
+                  {listingsEmployee ? ` — ${employees.find(e => e.id === listingsEmployee)?.full_name}` : ''}
+                  {' · '}{['day','week','month','all'].find(k => k === listingsPeriod) === 'day' ? 'Today' : listingsPeriod === 'week' ? 'This Week' : listingsPeriod === 'month' ? 'This Month' : 'All Time'}
                 </span>
                 <button onClick={exportListings} style={exportBtnStyle}>↓ Export CSV</button>
               </div>
@@ -602,7 +658,7 @@ export default function Admin({ profile }) {
 
       {/* Employee detail modal */}
       {empDetail && (() => {
-        const empListings = filteredListings.filter(l => l.user_id === empDetail.id);
+        const empListings = overviewListings.filter(l => l.user_id === empDetail.id);
         return (
           <div style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
