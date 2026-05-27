@@ -148,9 +148,9 @@ export default function MyListings({ profile, _debug }) {
       const file = batchPhotoFiles[i];
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `${profile.id}/${ts}_${i}_${safeName}`;
-      const { error: uploadErr } = await supabase.storage.from('batch-photos').upload(path, file);
+      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(path, file);
       if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from('batch-photos').getPublicUrl(path);
+        const { data: { publicUrl } } = supabase.storage.from('listing-photos').getPublicUrl(path);
         photo_urls.push(publicUrl);
       }
     }
