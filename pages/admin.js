@@ -61,6 +61,7 @@ export default function Admin({ profile }) {
   const [commentTarget, setCommentTarget] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
+  const [empDetail, setEmpDetail] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -326,7 +327,13 @@ export default function Admin({ profile }) {
                     <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
                   ) : employeeSummary.map(({ emp, count, complete }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
-                      <td style={{ ...tdStyle, fontWeight: 700 }}>{emp.full_name}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>
+                        <button onClick={() => setEmpDetail(emp)} style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          fontWeight: 700, fontSize: 13, color: GREEN, padding: 0,
+                          textDecoration: 'underline', textDecorationStyle: 'dotted',
+                        }}>{emp.full_name}</button>
+                      </td>
                       <td style={tdStyle}>{emp.location}</td>
                       <td style={{ ...tdStyle, fontWeight: 700, fontSize: 15 }}>
                         <span style={{ color: GREEN }}>{count}</span>
@@ -572,6 +579,60 @@ export default function Admin({ profile }) {
           </div>
         </div>
       )}
+
+      {/* Employee detail modal */}
+      {empDetail && (() => {
+        const empListings = filteredListings.filter(l => l.user_id === empDetail.id);
+        return (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16,
+          }} onClick={e => e.target === e.currentTarget && setEmpDetail(null)}>
+            <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 820, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 32px rgba(0,0,0,0.2)' }}>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>{empDetail.full_name}</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{empDetail.location} · {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {empListings.length} listing{empListings.length !== 1 ? 's' : ''}</div>
+                </div>
+                <button onClick={() => setEmpDetail(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ overflowY: 'auto', overflowX: 'auto' }}>
+                {empListings.length === 0 ? (
+                  <p style={{ padding: 24, color: '#999', textAlign: 'center', fontSize: 13 }}>No listings for this date.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#f0f4f0' }}>
+                        {['Time', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photos', 'Specs', 'Serial ✓', 'Condition', 'Notes'].map(h => (
+                          <th key={h} style={thStyle}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {empListings.map((l, i) => (
+                        <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
+                          <td style={tdStyle}>{formatTime(l.created_at)}</td>
+                          <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                          {['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'].map(c => (
+                            <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
+                              {l[c]
+                                ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span>
+                                : <span style={{ color: '#ddd' }}>–</span>}
+                            </td>
+                          ))}
+                          <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.photos_comments || ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
