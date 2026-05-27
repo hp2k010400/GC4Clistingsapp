@@ -76,7 +76,7 @@ export default function Dashboard({ profile, _debug }) {
   const supabase = createClient();
   const photoInputRef = useRef(null);
 
-  const [view, setView] = useState('batches');
+  const [view, setView] = useState('history');
   const [batches, setBatches] = useState([]);
   const [activeBatch, setActiveBatch] = useState(null);
   const [batchListings, setBatchListings] = useState([]);
@@ -305,16 +305,16 @@ export default function Dashboard({ profile, _debug }) {
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button onClick={() => { setView('batches'); setActiveBatch(null); }} style={{
-              padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
-              background: view !== 'history' ? GREEN : '#e8eee8',
-              color: view !== 'history' ? '#fff' : '#444',
-            }}>Batches</button>
             <button onClick={() => setView('history')} style={{
               padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
               background: view === 'history' ? GREEN : '#e8eee8',
               color: view === 'history' ? '#fff' : '#444',
-            }}>My History</button>
+            }}>My Listings</button>
+            <button onClick={() => { setView('batches'); setActiveBatch(null); }} style={{
+              padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+              background: view !== 'history' ? GREEN : '#e8eee8',
+              color: view !== 'history' ? '#fff' : '#444',
+            }}>+ Add Listings</button>
           </div>
 
           {/* ── BATCHES LIST ── */}
