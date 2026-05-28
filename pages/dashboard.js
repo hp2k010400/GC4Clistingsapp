@@ -261,6 +261,14 @@ export default function Dashboard({ profile, _debug }) {
     !historySearch || l.serial_id.toLowerCase().includes(historySearch.toLowerCase())
   );
 
+  const batchStats = filteredHistory.reduce((acc, l) => {
+    if (l.batch_id && l.batches?.difficulty && !acc.seen[l.batch_id]) {
+      acc.seen[l.batch_id] = true;
+      acc[l.batches.difficulty] = (acc[l.batches.difficulty] || 0) + 1;
+    }
+    return acc;
+  }, { seen: {}, easy: 0, medium: 0, hard: 0 });
+
   return (
     <>
       <Head><title>GC4C Listings — Dashboard</title></Head>
@@ -509,6 +517,18 @@ export default function Dashboard({ profile, _debug }) {
                   {filteredHistory.length} listing{filteredHistory.length !== 1 ? 's' : ''}
                 </span>
               </div>
+
+              {(batchStats.easy + batchStats.medium + batchStats.hard) > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, padding: '10px 14px', background: '#f8f9fa', borderRadius: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Batches</span>
+                  {DIFFICULTY.map(d => (
+                    <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ background: d.bg, color: d.color, fontWeight: 700, fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>{d.label}</span>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: d.color }}>{batchStats[d.key] || 0}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {historyLoading ? (
                 <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading…</p>

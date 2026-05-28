@@ -65,6 +65,7 @@ export default function Admin({ profile }) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [overviewPeriod, setOverviewPeriod] = useState('day');
   const [listingsPeriod, setListingsPeriod] = useState('week');
   const [listingsEmployee, setListingsEmployee] = useState('');
   const [listingsSearch, setListingsSearch] = useState('');
@@ -93,11 +94,13 @@ export default function Admin({ profile }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     const weekStart = getWeekStart();
+    const d = new Date();
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
     let fromDate = weekStart;
-    if (listingsPeriod === 'month') {
-      const d = new Date();
-      fromDate = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-    } else if (listingsPeriod === 'all') {
+    if (listingsPeriod === 'month' || overviewPeriod === 'month') {
+      fromDate = monthStart;
+    }
+    if (listingsPeriod === 'all') {
       fromDate = null;
     }
     let q = supabase
@@ -120,7 +123,7 @@ export default function Admin({ profile }) {
     setEmployees(allEmployees || []);
     setNotes(allNotes || []);
     setLoading(false);
-  }, [listingsPeriod]);
+  }, [listingsPeriod, overviewPeriod]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -248,9 +251,11 @@ export default function Admin({ profile }) {
     return true;
   });
 
-  // For Employee Overview tab — exact date + location
+  // For Employee Overview tab — period or exact date + location
   const overviewListings = listings.filter(l => {
-    if (l.date !== date) return false;
+    if (overviewPeriod === 'day' && l.date !== date) return false;
+    if (overviewPeriod === 'week' && l.date < weekStart) return false;
+    if (overviewPeriod === 'month' && l.date < monthStartStr) return false;
     if (location !== 'All Locations' && l.profiles?.location !== location) return false;
     return true;
   });
@@ -262,11 +267,19 @@ export default function Admin({ profile }) {
     return { loc, todayCount, weekCount };
   });
 
-  // Employee summary for selected date
+  // Employee summary for selected period
   const employeeSummary = employees.map(emp => {
     const empListings = overviewListings.filter(l => l.user_id === emp.id);
     const complete = empListings.filter(l => CHECKLIST.every(c => l[c])).length;
-    return { emp, count: empListings.length, complete };
+    const batchMap = {};
+    empListings.forEach(l => {
+      if (l.batch_id && l.batches?.difficulty && !batchMap[l.batch_id]) {
+        batchMap[l.batch_id] = l.batches.difficulty;
+      }
+    });
+    const batches = { easy: 0, medium: 0, hard: 0 };
+    Object.values(batchMap).forEach(d => { if (d in batches) batches[d]++; });
+    return { emp, count: empListings.length, complete, batches };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
 
   // Notes tab — filtered by open/resolved/all + period + location + employee + search
@@ -422,11 +435,29 @@ export default function Admin({ profile }) {
                     style={{ ...inputStyle, width: 160 }} />
                 </>
               ) : (
-                <div>
-                  <label style={labelStyle}>Date</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                    style={{ ...inputStyle, width: 150 }} />
-                </div>
+                <>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[
+                      { key: 'day', label: 'Day' },
+                      { key: 'week', label: 'This Week' },
+                      { key: 'month', label: 'This Month' },
+                    ].map(p => (
+                      <button key={p.key} onClick={() => setOverviewPeriod(p.key)} style={{
+                        padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                        fontWeight: 700, fontSize: 12,
+                        background: overviewPeriod === p.key ? GREEN : '#f0f4f0',
+                        color: overviewPeriod === p.key ? '#fff' : '#444',
+                      }}>{p.label}</button>
+                    ))}
+                  </div>
+                  {overviewPeriod === 'day' && (
+                    <div>
+                      <label style={labelStyle}>Date</label>
+                      <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                        style={{ ...inputStyle, width: 150 }} />
+                    </div>
+                  )}
+                </>
               )}
               <div>
                 <label style={labelStyle}>Location</label>
@@ -531,15 +562,15 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Complete', 'Checklist', ''].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Checklist', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
-                  ) : employeeSummary.map(({ emp, count, complete }, i) => (
+                    <tr><td colSpan={9} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                  ) : employeeSummary.map(({ emp, count, complete, batches }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>
                         <button onClick={() => setEmpDetail(emp)} style={{
@@ -552,6 +583,9 @@ export default function Admin({ profile }) {
                       <td style={{ ...tdStyle, fontWeight: 700, fontSize: 15 }}>
                         <span style={{ color: GREEN }}>{count}</span>
                       </td>
+                      <td style={tdStyle}><span style={{ background: '#d4edda', color: '#155724', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20 }}>{batches.easy}</span></td>
+                      <td style={tdStyle}><span style={{ background: '#fef3e2', color: '#e67e22', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20 }}>{batches.medium}</span></td>
+                      <td style={tdStyle}><span style={{ background: '#fde8e8', color: '#c0392b', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20 }}>{batches.hard}</span></td>
                       <td style={tdStyle}>
                         <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
                       </td>
@@ -580,6 +614,9 @@ export default function Admin({ profile }) {
                       <td style={{ ...tdStyle, fontWeight: 800 }}>TOTAL</td>
                       <td style={tdStyle}></td>
                       <td style={{ ...tdStyle, fontSize: 15, color: GREEN }}>{employeeSummary.reduce((s, e) => s + e.count, 0)}</td>
+                      <td style={{ ...tdStyle, color: '#155724' }}>{employeeSummary.reduce((s, e) => s + e.batches.easy, 0)}</td>
+                      <td style={{ ...tdStyle, color: '#e67e22' }}>{employeeSummary.reduce((s, e) => s + e.batches.medium, 0)}</td>
+                      <td style={{ ...tdStyle, color: '#c0392b' }}>{employeeSummary.reduce((s, e) => s + e.batches.hard, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
                       <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
