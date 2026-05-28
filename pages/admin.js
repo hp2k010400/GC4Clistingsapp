@@ -172,9 +172,9 @@ export default function Admin({ profile }) {
   }
 
   function exportOverview() {
-    const headers = ['Employee', 'Location', 'Date', 'Listings', 'Complete', 'Incomplete'];
+    const headers = ['Employee', 'Location', 'Date', 'Listings', 'Complete'];
     const rows = employeeSummary.map(({ emp, count, complete }) => [
-      emp.full_name, emp.location, date, count, complete, count - complete,
+      emp.full_name, emp.location, date, count, complete,
     ]);
     downloadCSV(`gc4c-overview-${date}.csv`, headers, rows);
   }
@@ -390,14 +390,14 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Complete', 'Incomplete', ''].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Complete', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                    <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
                   ) : employeeSummary.map(({ emp, count, complete }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>
@@ -415,11 +415,6 @@ export default function Admin({ profile }) {
                         <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ color: count - complete > 0 ? '#e67e22' : '#999', fontWeight: 600 }}>
-                          {count - complete}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>
                         <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
                           background: 'none', border: '1px solid #ddd', borderRadius: 5,
                           padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
@@ -435,7 +430,6 @@ export default function Admin({ profile }) {
                       <td style={tdStyle}></td>
                       <td style={{ ...tdStyle, fontSize: 15, color: GREEN }}>{employeeSummary.reduce((s, e) => s + e.count, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
-                      <td style={tdStyle}>{employeeSummary.reduce((s, e) => s + (e.count - e.complete), 0)}</td>
                       <td style={tdStyle}></td>
                     </tr>
                   </tfoot>
