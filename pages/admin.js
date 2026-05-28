@@ -79,9 +79,12 @@ export default function Admin({ profile }) {
   const [resetPassword, setResetPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSaving, setResetSaving] = useState(false);
-  const [commentTarget, setCommentTarget] = useState(null);
-  const [commentText, setCommentText] = useState('');
-  const [commentSaving, setCommentSaving] = useState(false);
+  const [noteTarget, setNoteTarget] = useState(null);
+  const [noteText, setNoteText] = useState('');
+  const [notePriority, setNotePriority] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [notesFilter, setNotesFilter] = useState('open');
+  const [notes, setNotes] = useState([]);
   const [empDetail, setEmpDetail] = useState(null);
 
   const loadData = useCallback(async () => {
@@ -100,13 +103,19 @@ export default function Admin({ profile }) {
       .order('created_at', { ascending: false });
     if (fromDate) q = q.gte('date', fromDate);
 
-    const [{ data: allListings }, { data: allEmployees }] = await Promise.all([
+    const [{ data: allListings }, { data: allEmployees }, { data: allNotes }] = await Promise.all([
       q,
       supabase.from('profiles').select('*').order('full_name'),
+      supabase.from('listings')
+        .select('*, profiles(full_name, location)')
+        .not('manager_note', 'is', null)
+        .order('note_priority', { ascending: false })
+        .order('created_at', { ascending: false }),
     ]);
 
     setListings(allListings || []);
     setEmployees(allEmployees || []);
+    setNotes(allNotes || []);
     setLoading(false);
   }, [listingsPeriod]);
 
@@ -135,13 +144,23 @@ export default function Admin({ profile }) {
     setResetPassword('');
   }
 
-  async function handleSaveComment(e) {
+  async function handleSaveNote(e) {
     e.preventDefault();
-    setCommentSaving(true);
-    await supabase.from('listings').update({ manager_comment: commentText.trim() || null }).eq('id', commentTarget.id);
-    setCommentSaving(false);
-    setCommentTarget(null);
-    setCommentText('');
+    setNoteSaving(true);
+    await supabase.from('listings').update({
+      manager_note: noteText.trim() || null,
+      note_priority: notePriority,
+      note_resolved: false,
+    }).eq('id', noteTarget.id);
+    setNoteSaving(false);
+    setNoteTarget(null);
+    setNoteText('');
+    setNotePriority(false);
+    loadData();
+  }
+
+  async function handleManagerResolve(listingId, resolved) {
+    await supabase.from('listings').update({ note_resolved: resolved }).eq('id', listingId);
     loadData();
   }
 
@@ -201,7 +220,7 @@ export default function Admin({ profile }) {
       l.serial_id_checked ? 'Yes' : 'No',
       l.condition ? 'Yes' : 'No',
       l.batches?.comments || '',
-      l.manager_comment || '',
+      l.manager_note || '',
     ]);
     downloadCSV(`gc4c-listings-${listingsPeriod}-${today()}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
   }
@@ -239,6 +258,13 @@ export default function Admin({ profile }) {
     const complete = empListings.filter(l => CHECKLIST.every(c => l[c])).length;
     return { emp, count: empListings.length, complete };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
+
+  // Notes tab — all-time, filtered by open/all + location
+  const filteredNotes = notes.filter(l => {
+    if (notesFilter === 'open' && l.note_resolved) return false;
+    if (location !== 'All Locations' && l.profiles?.location !== location) return false;
+    return true;
+  });
 
   return (
     <>
@@ -328,14 +354,18 @@ export default function Admin({ profile }) {
             display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
           }}>
             <div style={{ display: 'flex', gap: 8 }}>
-              {['overview', 'listings'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+              {[
+                { key: 'overview', label: 'Employee Overview' },
+                { key: 'listings', label: 'All Listings' },
+                { key: 'notes', label: `Notes${notes.filter(n => !n.note_resolved).length > 0 ? ` (${notes.filter(n => !n.note_resolved).length})` : ''}` },
+              ].map(({ key, label }) => (
+                <button key={key} onClick={() => setActiveTab(key)} style={{
                   padding: '6px 14px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer',
                   border: 'none',
-                  background: activeTab === tab ? GREEN : '#f0f4f0',
-                  color: activeTab === tab ? '#fff' : '#444',
+                  background: activeTab === key ? GREEN : '#f0f4f0',
+                  color: activeTab === key ? '#fff' : key === 'notes' && notes.filter(n => !n.note_resolved).length > 0 ? '#856404' : '#444',
                 }}>
-                  {tab === 'overview' ? 'Employee Overview' : 'All Listings'}
+                  {label}
                 </button>
               ))}
             </div>
@@ -385,6 +415,87 @@ export default function Admin({ profile }) {
 
           {loading ? (
             <p style={{ color: '#999', padding: 20, textAlign: 'center' }}>Loading…</p>
+          ) : activeTab === 'notes' ? (
+
+            /* Notes tab */
+            <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 8 }}>
+                {[
+                  { key: 'open', label: `Open (${notes.filter(n => !n.note_resolved).length})` },
+                  { key: 'all', label: 'All' },
+                ].map(f => (
+                  <button key={f.key} onClick={() => setNotesFilter(f.key)} style={{
+                    padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 12,
+                    background: notesFilter === f.key ? GREEN : '#f0f4f0',
+                    color: notesFilter === f.key ? '#fff' : '#444',
+                  }}>{f.label}</button>
+                ))}
+                <span style={{ marginLeft: 8, fontSize: 13, color: '#888' }}>{filteredNotes.length} note{filteredNotes.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f0f4f0' }}>
+                      {['Date', 'Employee', 'Location', 'Serial ID', 'Note', 'Priority', 'Status', ''].map(h => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredNotes.length === 0 ? (
+                      <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: '#999' }}>No notes found.</td></tr>
+                    ) : filteredNotes.map((l, i) => (
+                      <tr key={l.id} style={{
+                        background: l.note_resolved ? '#fafafa' : l.note_priority ? '#fffdf0' : (i % 2 === 0 ? '#fff' : '#fafafa'),
+                        borderBottom: '1px solid #eee',
+                        opacity: l.note_resolved ? 0.65 : 1,
+                      }}>
+                        <td style={tdStyle}>{l.date}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700 }}>{l.profiles?.full_name}</td>
+                        <td style={tdStyle}>{l.profiles?.location}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                        <td style={{ ...tdStyle, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: l.note_resolved ? 'line-through' : 'none', color: '#333' }}>
+                          {l.manager_note}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          {l.note_priority
+                            ? <span style={{ color: '#e67e22', fontWeight: 700, fontSize: 15 }}>⚑</span>
+                            : <span style={{ color: '#ddd' }}>—</span>}
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            background: l.note_resolved ? '#f0f0f0' : '#fff3cd',
+                            border: `1px solid ${l.note_resolved ? '#ddd' : '#ffc107'}`,
+                            borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700,
+                            color: l.note_resolved ? '#888' : '#856404',
+                          }}>
+                            {l.note_resolved ? 'Resolved' : 'Open'}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button onClick={() => { setNoteTarget(l); setNoteText(l.manager_note || ''); setNotePriority(l.note_priority || false); }} style={{
+                              background: 'none', border: '1px solid #ddd', borderRadius: 5,
+                              padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666',
+                            }}>Edit</button>
+                            <button onClick={() => handleManagerResolve(l.id, !l.note_resolved)} style={{
+                              background: l.note_resolved ? '#f0f4f0' : '#d4edda',
+                              border: `1px solid ${l.note_resolved ? '#ddd' : '#c3e6cb'}`,
+                              borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer',
+                              fontWeight: 700, color: l.note_resolved ? '#666' : '#155724', whiteSpace: 'nowrap',
+                            }}>
+                              {l.note_resolved ? 'Reopen' : '✓ Resolve'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           ) : activeTab === 'overview' ? (
 
             /* Employee overview table */
@@ -455,7 +566,7 @@ export default function Admin({ profile }) {
 
           ) : (
 
-            /* All listings table */
+            /* All listings table — activeTab === 'listings' */
             <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
               <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>
@@ -508,24 +619,28 @@ export default function Admin({ profile }) {
                         </td>
                         <td style={tdStyle}>
                           <button
-                            onClick={() => { setCommentTarget(l); setCommentText(l.manager_comment || ''); }}
+                            onClick={() => { setNoteTarget(l); setNoteText(l.manager_note || ''); setNotePriority(l.note_priority || false); }}
                             style={{
-                              background: 'none',
-                              border: `1px solid ${l.manager_comment ? '#c3e6cb' : '#e0e0e0'}`,
+                              background: l.manager_note
+                                ? (l.note_resolved ? '#f8f8f8' : l.note_priority ? '#fff3cd' : '#d4edda')
+                                : 'none',
+                              border: `1px solid ${l.manager_note ? (l.note_resolved ? '#ddd' : l.note_priority ? '#ffc107' : '#c3e6cb') : '#e0e0e0'}`,
                               borderRadius: 5,
                               cursor: 'pointer',
-                              color: l.manager_comment ? '#155724' : '#aaa',
+                              color: l.manager_note ? (l.note_resolved ? '#aaa' : l.note_priority ? '#856404' : '#155724') : '#aaa',
                               fontSize: 11,
                               padding: '2px 7px',
                               whiteSpace: 'nowrap',
                               maxWidth: 120,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
+                              textDecoration: l.note_resolved ? 'line-through' : 'none',
                             }}
-                            title={l.manager_comment || 'Add note'}
+                            title={l.manager_note || 'Add note'}
                           >
-                            {l.manager_comment
-                              ? (l.manager_comment.length > 16 ? l.manager_comment.slice(0, 16) + '…' : l.manager_comment)
+                            {l.note_priority && !l.note_resolved ? '⚑ ' : ''}
+                            {l.manager_note
+                              ? (l.manager_note.length > 14 ? l.manager_note.slice(0, 14) + '…' : l.manager_note)
                               : '+ Add note'}
                           </button>
                         </td>
@@ -598,36 +713,55 @@ export default function Admin({ profile }) {
         </div>
       )}
 
-      {/* Manager comment modal */}
-      {commentTarget && (
+      {/* Manager note modal */}
+      {noteTarget && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }} onClick={e => e.target === e.currentTarget && setCommentTarget(null)}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+        }} onClick={e => { if (e.target === e.currentTarget) { setNoteTarget(null); setNoteText(''); setNotePriority(false); } }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 440, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Manager Note</h2>
             <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
-              {commentTarget.serial_id} — {commentTarget.profiles?.full_name}
+              {noteTarget.serial_id} — {noteTarget.profiles?.full_name}
             </p>
-            <form onSubmit={handleSaveComment}>
+            <form onSubmit={handleSaveNote}>
               <textarea
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
                 rows={4}
                 autoFocus
                 style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
                 placeholder="Add a manager note…"
               />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="checkbox" checked={notePriority} onChange={e => setNotePriority(e.target.checked)} />
+                  <span style={{ fontWeight: 600, color: notePriority ? '#856404' : '#444' }}>Priority</span>
+                </label>
+                {noteTarget.manager_note && (
+                  <button type="button"
+                    onClick={async () => { await handleManagerResolve(noteTarget.id, !noteTarget.note_resolved); setNoteTarget(null); setNoteText(''); setNotePriority(false); }}
+                    style={{
+                      marginLeft: 'auto',
+                      background: noteTarget.note_resolved ? '#f0f4f0' : '#d4edda',
+                      border: `1px solid ${noteTarget.note_resolved ? '#ddd' : '#c3e6cb'}`,
+                      borderRadius: 5, padding: '4px 12px', fontSize: 12, cursor: 'pointer',
+                      fontWeight: 700, color: noteTarget.note_resolved ? '#666' : '#155724',
+                    }}>
+                    {noteTarget.note_resolved ? 'Reopen' : '✓ Resolve'}
+                  </button>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
-                <button type="button" onClick={() => setCommentTarget(null)} style={{
+                <button type="button" onClick={() => { setNoteTarget(null); setNoteText(''); setNotePriority(false); }} style={{
                   padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd',
                   background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                 }}>Cancel</button>
-                <button type="submit" disabled={commentSaving} style={{
+                <button type="submit" disabled={noteSaving} style={{
                   padding: '8px 18px', borderRadius: 6, border: 'none',
-                  background: commentSaving ? '#aaa' : GREEN, color: '#fff',
-                  cursor: commentSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
-                }}>{commentSaving ? 'Saving…' : 'Save'}</button>
+                  background: noteSaving ? '#aaa' : GREEN, color: '#fff',
+                  cursor: noteSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+                }}>{noteSaving ? 'Saving…' : 'Save Note'}</button>
               </div>
             </form>
           </div>
@@ -740,7 +874,7 @@ export default function Admin({ profile }) {
                                   </td>
                                 ))}
                                 <td style={{ ...tdStyle, color: '#666', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {l.photos_comments || ''}
+                                  {l.manager_note || ''}
                                 </td>
                               </tr>
                             ))}

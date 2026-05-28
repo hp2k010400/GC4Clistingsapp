@@ -99,18 +99,22 @@ export default function MyListings({ profile, _debug }) {
   const [pwForm, setPwForm] = useState({ newPassword: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+  const [noteViewTarget, setNoteViewTarget] = useState(null);
+  const [unresolvedNotesCount, setUnresolvedNotesCount] = useState(0);
 
   const loadStats = useCallback(async () => {
     const d = new Date();
     const day = d.getDay();
     d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
     const weekStart = d.toISOString().slice(0, 10);
-    const [{ count: tc }, { count: wc }] = await Promise.all([
+    const [{ count: tc }, { count: wc }, { count: nc }] = await Promise.all([
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).eq('date', today()),
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).gte('date', weekStart),
+      supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).not('manager_note', 'is', null).eq('note_resolved', false),
     ]);
     setStatsToday(tc || 0);
     setStatsWeek(wc || 0);
+    setUnresolvedNotesCount(nc || 0);
   }, [profile.id]);
 
   const loadBatches = useCallback(async () => {
@@ -209,6 +213,13 @@ export default function MyListings({ profile, _debug }) {
     showSuccess('Password updated.');
   }
 
+  async function handleEmployeeResolve(listingId) {
+    await supabase.from('listings').update({ note_resolved: true }).eq('id', listingId);
+    setNoteViewTarget(null);
+    loadHistory();
+    loadStats();
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/login');
@@ -266,7 +277,12 @@ export default function MyListings({ profile, _debug }) {
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button onClick={() => setView('history')} style={{ padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: view === 'history' ? GREEN : '#e8eee8', color: view === 'history' ? '#fff' : '#444' }}>My Listings</button>
+            <button onClick={() => setView('history')} style={{ padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: view === 'history' ? GREEN : '#e8eee8', color: view === 'history' ? '#fff' : '#444', display: 'flex', alignItems: 'center', gap: 7 }}>
+              My Listings
+              {unresolvedNotesCount > 0 && (
+                <span style={{ background: view === 'history' ? '#fff' : '#e67e22', color: view === 'history' ? '#e67e22' : '#fff', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>{unresolvedNotesCount}</span>
+              )}
+            </button>
             <button onClick={() => { setView('batches'); setActiveBatch(null); }} style={{ padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: view !== 'history' ? GREEN : '#e8eee8', color: view !== 'history' ? '#fff' : '#444' }}>+ Add Listings</button>
           </div>
 
@@ -372,18 +388,29 @@ export default function MyListings({ profile, _debug }) {
               {historyLoading ? <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading…</p> : filteredHistory.length === 0 ? <p style={{ color: '#999', fontSize: 13 }}>No listings found.</p> : (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead><tr style={{ background: '#f0f4f0' }}><th style={thStyle}>Date</th><th style={thStyle}>Time</th><th style={thStyle}>Serial ID</th><th style={thStyle}>Batch</th><th style={thStyle}>Photos / Batch</th>{CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}</tr></thead>
+                    <thead><tr style={{ background: '#f0f4f0' }}><th style={thStyle}>Date</th><th style={thStyle}>Time</th><th style={thStyle}>Serial ID</th><th style={thStyle}>Batch</th><th style={thStyle}>Photos / Batch</th>{CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}<th style={thStyle}>Note</th></tr></thead>
                     <tbody>
-                      {filteredHistory.map((l, i) => (
-                        <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
-                          <td style={tdStyle}>{new Date(l.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
-                          <td style={tdStyle}>{formatTime(l.created_at)}</td>
-                          <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
-                          <td style={tdStyle}>{l.batches ? <DiffBadge difficulty={l.batches.difficulty} /> : '—'}</td>
-                          <td style={{ ...tdStyle, color: '#555', fontSize: 12 }}>{l.batches?.comments || '—'}</td>
-                          {CHECKLIST.map(c => <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>{l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}</td>)}
-                        </tr>
-                      ))}
+                      {filteredHistory.map((l, i) => {
+                        const hasNote = l.manager_note && !l.note_resolved;
+                        const rowBg = hasNote ? (l.note_priority ? '#fffbf0' : '#fffff4') : (i % 2 === 0 ? '#fff' : '#fafafa');
+                        return (
+                          <tr key={l.id} style={{ background: rowBg, borderBottom: '1px solid #eee', borderLeft: hasNote ? `3px solid ${l.note_priority ? '#e67e22' : '#ffc107'}` : '3px solid transparent' }}>
+                            <td style={tdStyle}>{new Date(l.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
+                            <td style={tdStyle}>{formatTime(l.created_at)}</td>
+                            <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                            <td style={tdStyle}>{l.batches ? <DiffBadge difficulty={l.batches.difficulty} /> : '—'}</td>
+                            <td style={{ ...tdStyle, color: '#555', fontSize: 12 }}>{l.batches?.comments || '—'}</td>
+                            {CHECKLIST.map(c => <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>{l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}</td>)}
+                            <td style={tdStyle}>
+                              {l.manager_note ? (
+                                <button onClick={() => setNoteViewTarget(l)} style={{ background: l.note_resolved ? '#f0f0f0' : l.note_priority ? '#fff3cd' : '#fff8e1', border: `1px solid ${l.note_resolved ? '#ddd' : l.note_priority ? '#ffc107' : '#ffe082'}`, borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer', fontWeight: 700, color: l.note_resolved ? '#aaa' : l.note_priority ? '#856404' : '#795548', whiteSpace: 'nowrap' }}>
+                                  {l.note_resolved ? '✓ Done' : l.note_priority ? '⚑ Note' : '! Note'}
+                                </button>
+                              ) : <span style={{ color: '#ddd' }}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -392,6 +419,36 @@ export default function MyListings({ profile, _debug }) {
           )}
         </div>
       </div>
+
+      {/* Manager note view modal (employee) */}
+      {noteViewTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => e.target === e.currentTarget && setNoteViewTarget(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Manager Note</h2>
+              {noteViewTarget.note_priority && (
+                <span style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: '#856404' }}>Priority</span>
+              )}
+              {noteViewTarget.note_resolved && (
+                <span style={{ background: '#f0f0f0', border: '1px solid #ddd', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: '#888' }}>Resolved</span>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>{noteViewTarget.serial_id}</p>
+            <div style={{ background: '#f8f9fa', border: '1px solid #e0e0e0', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: '#333', lineHeight: 1.6, marginBottom: 18 }}>
+              {noteViewTarget.manager_note}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setNoteViewTarget(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Close</button>
+              {!noteViewTarget.note_resolved && (
+                <button onClick={() => handleEmployeeResolve(noteViewTarget.id)} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: GREEN, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                  ✓ Mark as Done
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showBatchForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={e => e.target === e.currentTarget && setShowBatchForm(false)}>
