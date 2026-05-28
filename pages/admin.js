@@ -650,7 +650,7 @@ export default function Admin({ profile }) {
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
                       {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note', ''].map(h => (
-                        <th key={h} style={thStyle}>{h}</th>
+                        <th key={h} style={{ ...thStyle, textAlign: h === 'Photos / Batch' ? 'center' : 'left' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
