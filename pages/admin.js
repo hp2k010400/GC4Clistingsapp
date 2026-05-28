@@ -673,7 +673,7 @@ export default function Admin({ profile }) {
                               : <span style={{ color: '#ddd' }}>–</span>}
                           </td>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', minWidth: 120 }}>
+                        <td style={{ ...tdStyle, color: '#666', whiteSpace: 'nowrap' }}>
                           {[l.batches?.comments, l.batches?.description].filter(Boolean).join(' — ')}
                         </td>
                         <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
