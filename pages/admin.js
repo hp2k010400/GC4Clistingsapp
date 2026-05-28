@@ -175,6 +175,12 @@ export default function Admin({ profile }) {
     loadData();
   }
 
+  async function handleDeleteListing(id) {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    await supabase.from('listings').delete().eq('id', id);
+    loadData();
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/login');
@@ -643,14 +649,14 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note'].map(h => (
+                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note', ''].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredListings.length === 0 ? (
-                      <tr><td colSpan={14} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
+                      <tr><td colSpan={15} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
                     ) : filteredListings.map((l, i) => (
                       <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee', verticalAlign: 'top' }}>
                         <td style={tdStyle}>
@@ -697,6 +703,12 @@ export default function Admin({ profile }) {
                               ? (l.manager_note.length > 14 ? l.manager_note.slice(0, 14) + '…' : l.manager_note)
                               : '+ Add note'}
                           </button>
+                        </td>
+                        <td style={tdStyle}>
+                          <button onClick={() => handleDeleteListing(l.id)} style={{
+                            background: 'none', border: '1px solid #e8c0c0', borderRadius: 5,
+                            padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b',
+                          }}>Delete</button>
                         </td>
                       </tr>
                     ))}
