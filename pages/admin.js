@@ -611,8 +611,8 @@ export default function Admin({ profile }) {
                             background: 'none', border: '1px solid #ddd', borderRadius: 5,
                             padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
                           }}>Reset pwd</button>
-                          <button onClick={async () => {
-                            const newRole = emp.role === 'manager' ? 'employee' : 'manager';
+                          <select value={emp.role} onChange={async e => {
+                            const newRole = e.target.value;
                             if (!confirm(`Change ${emp.full_name} to ${newRole}?`)) return;
                             const { data: { session: sess } } = await supabase.auth.getSession();
                             await fetch('/api/admin/update-role', {
@@ -621,14 +621,10 @@ export default function Admin({ profile }) {
                               body: JSON.stringify({ userId: emp.id, role: newRole }),
                             });
                             loadData();
-                          }} style={{
-                            background: emp.role === 'manager' ? '#fde8e8' : '#e8f5ee',
-                            border: `1px solid ${emp.role === 'manager' ? '#f5c6cb' : '#c3e6cb'}`,
-                            borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer',
-                            color: emp.role === 'manager' ? '#c0392b' : '#155724', whiteSpace: 'nowrap', fontWeight: 600,
-                          }}>
-                            {emp.role === 'manager' ? 'Demote' : 'Promote'}
-                          </button>
+                          }} style={{ ...inputStyle, width: 100, fontSize: 11, padding: '3px 6px' }}>
+                            <option value="employee">Employee</option>
+                            <option value="manager">Manager</option>
+                          </select>
                         </div>
                       </td>
                     </tr>
