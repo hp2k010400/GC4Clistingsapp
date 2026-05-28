@@ -606,10 +606,30 @@ export default function Admin({ profile }) {
                         </button>
                       </td>
                       <td style={tdStyle}>
-                        <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
-                          background: 'none', border: '1px solid #ddd', borderRadius: 5,
-                          padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
-                        }}>Reset pwd</button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
+                            background: 'none', border: '1px solid #ddd', borderRadius: 5,
+                            padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
+                          }}>Reset pwd</button>
+                          <button onClick={async () => {
+                            const newRole = emp.role === 'manager' ? 'employee' : 'manager';
+                            if (!confirm(`Change ${emp.full_name} to ${newRole}?`)) return;
+                            const { data: { session: sess } } = await supabase.auth.getSession();
+                            await fetch('/api/admin/update-role', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` },
+                              body: JSON.stringify({ userId: emp.id, role: newRole }),
+                            });
+                            loadData();
+                          }} style={{
+                            background: emp.role === 'manager' ? '#fde8e8' : '#e8f5ee',
+                            border: `1px solid ${emp.role === 'manager' ? '#f5c6cb' : '#c3e6cb'}`,
+                            borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer',
+                            color: emp.role === 'manager' ? '#c0392b' : '#155724', whiteSpace: 'nowrap', fontWeight: 600,
+                          }}>
+                            {emp.role === 'manager' ? 'Demote' : 'Promote'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
