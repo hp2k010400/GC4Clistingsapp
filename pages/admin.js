@@ -84,6 +84,9 @@ export default function Admin({ profile }) {
   const [notePriority, setNotePriority] = useState(false);
   const [noteSaving, setNoteSaving] = useState(false);
   const [notesFilter, setNotesFilter] = useState('open');
+  const [notesPeriod, setNotesPeriod] = useState('all');
+  const [notesEmployee, setNotesEmployee] = useState('');
+  const [notesSearch, setNotesSearch] = useState('');
   const [notes, setNotes] = useState([]);
   const [empDetail, setEmpDetail] = useState(null);
 
@@ -209,13 +212,12 @@ export default function Admin({ profile }) {
   }
 
   function exportListings() {
-    const headers = ['Date', 'Time', 'Employee', 'Location', 'Batch Difficulty', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Batch Comments', 'Manager Note'];
+    const headers = ['Date', 'Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Photographs', 'Specifications', 'Serial ID Check', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note'];
     const rows = filteredListings.map(l => [
       l.date,
       formatTime(l.created_at),
       l.profiles?.full_name,
       l.profiles?.location,
-      l.batches?.difficulty || '',
       l.serial_id,
       l.metafields ? 'Yes' : 'No',
       l.title ? 'Yes' : 'No',
@@ -225,6 +227,7 @@ export default function Admin({ profile }) {
       l.serial_id_checked ? 'Yes' : 'No',
       l.condition ? 'Yes' : 'No',
       l.batches?.comments || '',
+      l.batches?.difficulty || '',
       l.manager_note || '',
     ]);
     downloadCSV(`gc4c-listings-${listingsPeriod}-${today()}${location !== 'All Locations' ? '-' + location.replace(' ', '-') : ''}.csv`, headers, rows);
@@ -232,6 +235,8 @@ export default function Admin({ profile }) {
 
   const todayStr = today();
   const weekStart = getWeekStart();
+  const d2 = new Date();
+  const monthStartStr = new Date(d2.getFullYear(), d2.getMonth(), 1).toISOString().slice(0, 10);
 
   // For All Listings tab — period + location + employee + search
   const filteredListings = listings.filter(l => {
@@ -264,10 +269,16 @@ export default function Admin({ profile }) {
     return { emp, count: empListings.length, complete };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
 
-  // Notes tab — all-time, filtered by open/all + location
+  // Notes tab — filtered by open/resolved/all + period + location + employee + search
   const filteredNotes = notes.filter(l => {
     if (notesFilter === 'open' && l.note_resolved) return false;
+    if (notesFilter === 'resolved' && !l.note_resolved) return false;
+    if (notesPeriod === 'day' && l.date !== todayStr) return false;
+    if (notesPeriod === 'week' && l.date < weekStart) return false;
+    if (notesPeriod === 'month' && l.date < monthStartStr) return false;
     if (location !== 'All Locations' && l.profiles?.location !== location) return false;
+    if (notesEmployee && l.user_id !== notesEmployee) return false;
+    if (notesSearch && !l.serial_id.toLowerCase().includes(notesSearch.toLowerCase())) return false;
     return true;
   });
 
@@ -375,7 +386,7 @@ export default function Admin({ profile }) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
-              {activeTab === 'listings' ? (
+              {activeTab === 'listings' || activeTab === 'notes' ? (
                 <>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {[
@@ -383,23 +394,31 @@ export default function Admin({ profile }) {
                       { key: 'week', label: 'This Week' },
                       { key: 'month', label: 'This Month' },
                       { key: 'all', label: 'All Time' },
-                    ].map(p => (
-                      <button key={p.key} onClick={() => setListingsPeriod(p.key)} style={{
-                        padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                        fontWeight: 700, fontSize: 12,
-                        background: listingsPeriod === p.key ? GREEN : '#f0f4f0',
-                        color: listingsPeriod === p.key ? '#fff' : '#444',
-                      }}>{p.label}</button>
-                    ))}
+                    ].map(p => {
+                      const active = activeTab === 'listings' ? listingsPeriod : notesPeriod;
+                      const setter = activeTab === 'listings' ? setListingsPeriod : setNotesPeriod;
+                      return (
+                        <button key={p.key} onClick={() => setter(p.key)} style={{
+                          padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          fontWeight: 700, fontSize: 12,
+                          background: active === p.key ? GREEN : '#f0f4f0',
+                          color: active === p.key ? '#fff' : '#444',
+                        }}>{p.label}</button>
+                      );
+                    })}
                   </div>
-                  <select value={listingsEmployee} onChange={e => setListingsEmployee(e.target.value)} style={{ ...inputStyle, width: 160 }}>
+                  <select
+                    value={activeTab === 'listings' ? listingsEmployee : notesEmployee}
+                    onChange={e => activeTab === 'listings' ? setListingsEmployee(e.target.value) : setNotesEmployee(e.target.value)}
+                    style={{ ...inputStyle, width: 160 }}>
                     <option value="">All Employees</option>
                     {employees.filter(e => location === 'All Locations' || e.location === location).map(e => (
                       <option key={e.id} value={e.id}>{e.full_name}</option>
                     ))}
                   </select>
-                  <input type="text" placeholder="Search Serial ID…" value={listingsSearch}
-                    onChange={e => setListingsSearch(e.target.value)}
+                  <input type="text" placeholder="Search Serial ID…"
+                    value={activeTab === 'listings' ? listingsSearch : notesSearch}
+                    onChange={e => activeTab === 'listings' ? setListingsSearch(e.target.value) : setNotesSearch(e.target.value)}
                     style={{ ...inputStyle, width: 160 }} />
                 </>
               ) : (
@@ -427,6 +446,7 @@ export default function Admin({ profile }) {
               <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {[
                   { key: 'open', label: `Open (${notes.filter(n => !n.note_resolved).length})` },
+                  { key: 'resolved', label: `Resolved (${notes.filter(n => n.note_resolved).length})` },
                   { key: 'all', label: 'All' },
                 ].map(f => (
                   <button key={f.key} onClick={() => setNotesFilter(f.key)} style={{
@@ -586,23 +606,22 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Time', 'Employee', 'Location', 'Difficulty', 'Photos / Batch', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos', 'Manager Note'].map(h => (
+                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredListings.length === 0 ? (
-                      <tr><td colSpan={15} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
+                      <tr><td colSpan={14} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
                     ) : filteredListings.map((l, i) => (
-                      <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
-                        <td style={tdStyle}>{formatTime(l.created_at)}</td>
+                      <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee', verticalAlign: 'top' }}>
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 600 }}>{l.date}</div>
+                          <div style={{ fontSize: 11, color: '#888' }}>{formatTime(l.created_at)}</div>
+                        </td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.profiles?.full_name}</td>
                         <td style={tdStyle}>{l.profiles?.location}</td>
-                        <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {l.batches?.comments || ''}
-                        </td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
                         {CHECKLIST.map(c => (
                           <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
@@ -611,17 +630,10 @@ export default function Admin({ profile }) {
                               : <span style={{ color: '#ddd' }}>–</span>}
                           </td>
                         ))}
-                        <td style={tdStyle}>
-                          {l.batches?.photo_urls?.length > 0 ? (
-                            <div style={{ display: 'flex', gap: 3 }}>
-                              {l.batches.photo_urls.map((url, idx) => (
-                                <a key={idx} href={url} target="_blank" rel="noreferrer">
-                                  <img src={url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 3, border: '1px solid #ddd' }} />
-                                </a>
-                              ))}
-                            </div>
-                          ) : <span style={{ color: '#ddd' }}>—</span>}
+                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.batches?.comments || ''}
                         </td>
+                        <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
                         <td style={tdStyle}>
                           <button
                             onClick={() => { setNoteTarget(l); setNoteText(l.manager_note || ''); setNotePriority(l.note_priority || false); }}

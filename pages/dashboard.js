@@ -219,6 +219,13 @@ export default function Dashboard({ profile, _debug }) {
     loadBatchListings(activeBatch.id);
   }
 
+  async function handleDeleteHistoryListing(id) {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    await supabase.from('listings').delete().eq('id', id);
+    loadHistory();
+    loadStats();
+  }
+
   async function handleChangePassword(e) {
     e.preventDefault();
     setPwError('');
@@ -404,7 +411,15 @@ export default function Dashboard({ profile, _debug }) {
                   </div>
 
                   <div style={{ marginTop: 16 }}>
-                    <label style={labelStyle}>Checklist</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                      <label style={{ ...labelStyle, marginBottom: 0 }}>Checklist</label>
+                      {!profile.mandatory_checklist && (
+                        <button type="button" onClick={() => setForm(f => ({ ...f, ...Object.fromEntries(CHECKLIST.map(c => [c.key, true])) }))} style={{
+                          background: '#f0f4f0', border: '1px solid #c3e6cb', borderRadius: 5,
+                          padding: '2px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 700, color: GREEN,
+                        }}>Select All</button>
+                      )}
+                    </div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
                       {CHECKLIST.map(({ key, label }) => (
                         <label key={key} style={{
@@ -511,6 +526,7 @@ export default function Dashboard({ profile, _debug }) {
                         <th style={thStyle}>Photos / Batch</th>
                         {CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}
                         <th style={thStyle}>Note</th>
+                        <th style={thStyle}></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -543,6 +559,12 @@ export default function Dashboard({ profile, _debug }) {
                                   {l.note_resolved ? '✓ Done' : l.note_priority ? '⚑ Note' : '! Note'}
                                 </button>
                               ) : <span style={{ color: '#ddd' }}>—</span>}
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                              <button onClick={() => handleDeleteHistoryListing(l.id)} style={{
+                                background: 'none', border: '1px solid #e8c0c0', borderRadius: 5,
+                                padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b',
+                              }} title="Delete listing">Delete</button>
                             </td>
                           </tr>
                         );
