@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
@@ -71,7 +71,6 @@ export default function MyListings({ profile, _debug }) {
 
   const router = useRouter();
   const supabase = createClient();
-  const photoInputRef = useRef(null);
 
   const [view, setView] = useState('history');
   const [batches, setBatches] = useState([]);
@@ -79,7 +78,6 @@ export default function MyListings({ profile, _debug }) {
   const [batchListings, setBatchListings] = useState([]);
   const [showBatchForm, setShowBatchForm] = useState(false);
   const [batchForm, setBatchForm] = useState(EMPTY_BATCH);
-  const [batchPhotoFiles, setBatchPhotoFiles] = useState([]);
   const [batchCreating, setBatchCreating] = useState(false);
   const [batchError, setBatchError] = useState('');
 
@@ -158,28 +156,13 @@ export default function MyListings({ profile, _debug }) {
     setBatchError('');
     if (!batchForm.difficulty) { setBatchError('Please select a difficulty.'); return; }
     setBatchCreating(true);
-    const ts = Date.now();
-    const photo_urls = [];
-    for (let i = 0; i < batchPhotoFiles.length; i++) {
-      const file = batchPhotoFiles[i];
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `${profile.id}/${ts}_${i}_${safeName}`;
-      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(path, file);
-      if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from('listing-photos').getPublicUrl(path);
-        photo_urls.push(publicUrl);
-      }
-    }
     const { data: batch, error: err } = await supabase.from('batches').insert({
       user_id: profile.id, date: today(), difficulty: batchForm.difficulty,
       comments: batchForm.comments.trim() || null,
-      photo_urls: photo_urls.length > 0 ? photo_urls : null,
     }).select().single();
     setBatchCreating(false);
     if (err) { setBatchError('Failed to create batch. Try again.'); return; }
     setBatchForm(EMPTY_BATCH);
-    setBatchPhotoFiles([]);
-    if (photoInputRef.current) photoInputRef.current.value = '';
     setShowBatchForm(false);
     setActiveBatch(batch);
     setBatchListings([]);
@@ -291,7 +274,7 @@ export default function MyListings({ profile, _debug }) {
             <div style={cardStyle}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <h2 style={cardTitleStyle}>Today's Batches <span style={{ marginLeft: 10, background: GREEN, color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 13, fontWeight: 700 }}>{batches.length}</span></h2>
-                <button onClick={() => { setBatchForm(EMPTY_BATCH); setBatchError(''); setBatchPhotoFiles([]); setShowBatchForm(true); }} style={btnStyle}>+ New Batch</button>
+                <button onClick={() => { setBatchForm(EMPTY_BATCH); setBatchError(''); setShowBatchForm(true); }} style={btnStyle}>+ New Batch</button>
               </div>
               {batches.length === 0 ? (
                 <p style={{ color: '#999', fontSize: 13 }}>No batches started today. Hit "+ New Batch" to begin.</p>
@@ -301,7 +284,6 @@ export default function MyListings({ profile, _debug }) {
                     <button key={batch.id} onClick={() => { setActiveBatch(batch); loadBatchListings(batch.id); setView('batch-detail'); }} style={{ background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 8, padding: '12px 16px', cursor: 'pointer', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 12 }}>
                       <DiffBadge difficulty={batch.difficulty} />
                       <span style={{ fontSize: 13, color: '#555', flex: 1 }}>{batch.comments || <em style={{ color: '#bbb' }}>No comments</em>}</span>
-                      {batch.photo_urls?.length > 0 && <span style={{ fontSize: 12, color: '#888' }}>📷 {batch.photo_urls.length}</span>}
                       <span style={{ fontSize: 12, color: '#bbb' }}>{formatTime(batch.created_at)}</span>
                       <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>Open →</span>
                     </button>
@@ -318,7 +300,6 @@ export default function MyListings({ profile, _debug }) {
                   <button onClick={() => { setView('batches'); setActiveBatch(null); setForm(EMPTY_FORM); setError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 13, padding: 0, fontWeight: 600 }}>← Batches</button>
                   <DiffBadge difficulty={activeBatch.difficulty} />
                   {activeBatch.comments && <span style={{ fontSize: 13, color: '#555' }}>{activeBatch.comments}</span>}
-                  {activeBatch.photo_urls?.length > 0 && <span style={{ fontSize: 12, color: '#888' }}>📷 {activeBatch.photo_urls.length} photo{activeBatch.photo_urls.length !== 1 ? 's' : ''}</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: '#555' }}>{batchListings.length} listing{batchListings.length !== 1 ? 's' : ''} in this batch</span>
                 </div>
               </div>
@@ -425,13 +406,8 @@ export default function MyListings({ profile, _debug }) {
                 </div>
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Comments</label>
-                <textarea value={batchForm.comments} onChange={e => setBatchForm(f => ({ ...f, comments: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} placeholder="e.g. Titleist bag, mixed irons, some rust…" />
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Photos</label>
-                <input ref={photoInputRef} type="file" multiple accept="image/*" onChange={e => setBatchPhotoFiles(Array.from(e.target.files))} style={{ fontSize: 13, width: '100%' }} />
-                {batchPhotoFiles.length > 0 && <p style={{ fontSize: 12, color: '#555', marginTop: 4 }}>{batchPhotoFiles.length} photo{batchPhotoFiles.length !== 1 ? 's' : ''} selected</p>}
+                <label style={labelStyle}>Photos / Batch</label>
+                <textarea value={batchForm.comments} onChange={e => setBatchForm(f => ({ ...f, comments: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} placeholder="e.g. 27/05 Batch 1 M5" />
               </div>
               {batchError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{batchError}</p>}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
