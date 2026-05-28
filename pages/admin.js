@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
@@ -90,6 +90,12 @@ export default function Admin({ profile }) {
   const [notesSearch, setNotesSearch] = useState('');
   const [notes, setNotes] = useState([]);
   const [empDetail, setEmpDetail] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [listingsPage, setListingsPage] = useState(1);
+  const scrollRef = useRef(null);
+  const topScrollRef = useRef(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -174,6 +180,26 @@ export default function Admin({ profile }) {
     await supabase.from('listings').update({ note_resolved: resolved }).eq('id', listingId);
     loadData();
   }
+
+  async function handleSaveEdit(e) {
+    e.preventDefault();
+    setEditSaving(true);
+    await supabase.from('listings').update({
+      serial_id: editForm.serial_id.trim(),
+      metafields: editForm.metafields,
+      title: editForm.title,
+      price: editForm.price,
+      photographs: editForm.photographs,
+      specifications: editForm.specifications,
+      serial_id_checked: editForm.serial_id_checked,
+      condition: editForm.condition,
+    }).eq('id', editTarget.id);
+    setEditSaving(false);
+    setEditTarget(null);
+    loadData();
+  }
+
+  useEffect(() => { setListingsPage(1); }, [listingsPeriod, listingsEmployee, listingsSearch, location]);
 
   async function handleDeleteListing(id) {
     if (!confirm('Delete this listing? This cannot be undone.')) return;
@@ -287,6 +313,10 @@ export default function Admin({ profile }) {
     Object.values(batchMap).forEach(d => { if (d in batches) batches[d]++; });
     return { emp, count: empListings.length, complete, batches };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
+
+  const PAGE_SIZE = 10;
+  const totalListingsPages = Math.ceil(filteredListings.length / PAGE_SIZE);
+  const paginatedListings = filteredListings.slice((listingsPage - 1) * PAGE_SIZE, listingsPage * PAGE_SIZE);
 
   // Notes tab — filtered by open/resolved/all + period + location + employee + search
   const filteredNotes = notes.filter(l => {
@@ -661,19 +691,24 @@ export default function Admin({ profile }) {
                 </span>
                 <button onClick={exportListings} style={exportBtnStyle}>↓ Export CSV</button>
               </div>
-              <div style={{ overflowX: 'auto' }}>
+              <div ref={topScrollRef} onScroll={e => { if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+                style={{ overflowX: 'auto', overflowY: 'hidden', borderBottom: '1px solid #eee' }}>
+                <div style={{ height: 8, minWidth: 1800 }} />
+              </div>
+              <div ref={scrollRef} onScroll={e => { if (topScrollRef.current) topScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+                style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note', ''].map(h => (
+                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note', 'Emp Note', ''].map(h => (
                         <th key={h} style={{ ...thStyle, textAlign: h === 'Photos / Batch' ? 'center' : 'left' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredListings.length === 0 ? (
-                      <tr><td colSpan={15} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
-                    ) : filteredListings.map((l, i) => (
+                    {paginatedListings.length === 0 ? (
+                      <tr><td colSpan={16} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
+                    ) : paginatedListings.map((l, i) => (
                       <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee', verticalAlign: 'top' }}>
                         <td style={tdStyle}>
                           <div style={{ fontWeight: 600 }}>{l.date.split('-').reverse().join('/')}</div>
@@ -720,21 +755,77 @@ export default function Admin({ profile }) {
                               : '+ Add note'}
                           </button>
                         </td>
-                        <td style={tdStyle}>
-                          <button onClick={() => handleDeleteListing(l.id)} style={{
-                            background: 'none', border: '1px solid #e8c0c0', borderRadius: 5,
-                            padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b',
-                          }}>Delete</button>
+                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={l.employee_note || ''}>
+                          {l.employee_note
+                            ? <span style={{ background: '#e8f0fe', border: '1px solid #c5d3f5', borderRadius: 5, padding: '2px 7px', fontSize: 11, color: '#1a56db' }}>
+                                {l.employee_note.length > 16 ? l.employee_note.slice(0, 16) + '…' : l.employee_note}
+                              </span>
+                            : <span style={{ color: '#ddd' }}>—</span>}
+                        </td>
+                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => { setEditTarget(l); setEditForm({ serial_id: l.serial_id, metafields: l.metafields, title: l.title, price: l.price, photographs: l.photographs, specifications: l.specifications, serial_id_checked: l.serial_id_checked, condition: l.condition }); }} style={{
+                              background: 'none', border: '1px solid #c5d3f5', borderRadius: 5,
+                              padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#1a56db',
+                            }}>Edit</button>
+                            <button onClick={() => handleDeleteListing(l.id)} style={{
+                              background: 'none', border: '1px solid #e8c0c0', borderRadius: 5,
+                              padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b',
+                            }}>Delete</button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {totalListingsPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', borderTop: '1px solid #eee' }}>
+                  <button onClick={() => setListingsPage(p => Math.max(1, p - 1))} disabled={listingsPage === 1}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: listingsPage === 1 ? 'not-allowed' : 'pointer', color: listingsPage === 1 ? '#ccc' : '#444', fontWeight: 600, fontSize: 12 }}>← Prev</button>
+                  <span style={{ fontSize: 13, color: '#666' }}>Page {listingsPage} of {totalListingsPages} · {filteredListings.length} total</span>
+                  <button onClick={() => setListingsPage(p => Math.min(totalListingsPages, p + 1))} disabled={listingsPage === totalListingsPages}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: listingsPage === totalListingsPages ? 'not-allowed' : 'pointer', color: listingsPage === totalListingsPages ? '#ccc' : '#444', fontWeight: 600, fontSize: 12 }}>Next →</button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Edit listing modal */}
+      {editTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => e.target === e.currentTarget && setEditTarget(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 480, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16 }}>Edit Listing</h2>
+            <form onSubmit={handleSaveEdit}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Serial ID</label>
+                <input type="text" required value={editForm.serial_id} onChange={e => setEditForm(f => ({ ...f, serial_id: e.target.value }))} style={inputStyle} />
+              </div>
+              <label style={labelStyle}>Checklist</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, marginBottom: 18 }}>
+                {[
+                  { key: 'metafields', label: 'Metafields' }, { key: 'title', label: 'Title' }, { key: 'price', label: 'Price' },
+                  { key: 'photographs', label: 'Photographs' }, { key: 'specifications', label: 'Specifications' },
+                  { key: 'serial_id_checked', label: 'Serial ID' }, { key: 'condition', label: 'Condition' },
+                ].map(({ key, label }) => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, background: editForm[key] ? '#e8f5ee' : '#f5f5f5', border: `1.5px solid ${editForm[key] ? GREEN : '#d0d0d0'}`, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    <input type="checkbox" checked={editForm[key]} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.checked }))} style={{ accentColor: GREEN }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setEditTarget(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={editSaving} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: editSaving ? '#aaa' : GREEN, color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>{editSaving ? 'Saving…' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create employee modal */}
       {showCreate && (

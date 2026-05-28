@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { createServerSupabaseClient } from '../lib/supabaseServer';
@@ -104,6 +104,16 @@ export default function Dashboard({ profile, _debug }) {
   const [pwSaving, setPwSaving] = useState(false);
   const [noteViewTarget, setNoteViewTarget] = useState(null);
   const [unresolvedNotesCount, setUnresolvedNotesCount] = useState(0);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [empNoteTarget, setEmpNoteTarget] = useState(null);
+  const [empNoteText, setEmpNoteText] = useState('');
+  const [empNoteSaving, setEmpNoteSaving] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const scrollRef = useRef(null);
+  const topScrollRef = useRef(null);
+  const PAGE_SIZE = 10;
 
   const loadStats = useCallback(async () => {
     const d = new Date();
@@ -166,6 +176,7 @@ export default function Dashboard({ profile, _debug }) {
 
   useEffect(() => { loadBatches(); loadStats(); }, [loadBatches, loadStats]);
   useEffect(() => { if (view === 'history') loadHistory(); }, [view, loadHistory]);
+  useEffect(() => { setHistoryPage(1); }, [historyFilter, historySearch]);
 
   async function handleCreateBatch(e) {
     e.preventDefault();
@@ -227,6 +238,40 @@ export default function Dashboard({ profile, _debug }) {
     loadStats();
   }
 
+  async function handleSaveEdit(e) {
+    e.preventDefault();
+    setEditSaving(true);
+    await supabase.from('listings').update({
+      serial_id: editForm.serial_id.trim(),
+      metafields: editForm.metafields,
+      title: editForm.title,
+      price: editForm.price,
+      photographs: editForm.photographs,
+      specifications: editForm.specifications,
+      serial_id_checked: editForm.serial_id_checked,
+      condition: editForm.condition,
+    }).eq('id', editTarget.id);
+    setEditSaving(false);
+    setEditTarget(null);
+    loadHistory();
+  }
+
+  async function handleSaveEmpNote(e) {
+    e.preventDefault();
+    setEmpNoteSaving(true);
+    await supabase.from('listings').update({ employee_note: empNoteText.trim() || null }).eq('id', empNoteTarget.id);
+    setEmpNoteSaving(false);
+    setEmpNoteTarget(null);
+    setEmpNoteText('');
+    loadHistory();
+  }
+
+  async function handleDeleteBatch(batchId) {
+    if (!confirm('Delete this batch? Listings in it will remain but won\'t be linked to it.')) return;
+    await supabase.from('batches').delete().eq('id', batchId);
+    loadBatches();
+  }
+
   async function handleChangePassword(e) {
     e.preventDefault();
     setPwError('');
@@ -261,6 +306,9 @@ export default function Dashboard({ profile, _debug }) {
   const filteredHistory = historyListings.filter(l =>
     !historySearch || l.serial_id.toLowerCase().includes(historySearch.toLowerCase())
   );
+
+  const totalHistoryPages = Math.ceil(filteredHistory.length / PAGE_SIZE);
+  const paginatedHistory = filteredHistory.slice((historyPage - 1) * PAGE_SIZE, historyPage * PAGE_SIZE);
 
   const batchStats = filteredHistory.reduce((acc, l) => {
     if (l.batch_id && l.batches?.difficulty && !acc.seen[l.batch_id]) {
@@ -357,18 +405,21 @@ export default function Dashboard({ profile, _debug }) {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {batches.map(batch => (
-                    <button key={batch.id} onClick={() => { setActiveBatch(batch); loadBatchListings(batch.id); setView('batch-detail'); }} style={{
-                      background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 8,
-                      padding: '12px 16px', cursor: 'pointer', textAlign: 'left', width: '100%',
-                      display: 'flex', alignItems: 'center', gap: 12,
-                    }}>
-                      <DiffBadge difficulty={batch.difficulty} />
-                      <span style={{ fontSize: 13, color: '#555', flex: 1 }}>
-                        {[batch.comments, batch.description].filter(Boolean).join(' — ') || <em style={{ color: '#bbb' }}>No details</em>}
-                      </span>
-                      <span style={{ fontSize: 12, color: '#bbb' }}>{formatTime(batch.created_at)}</span>
-                      <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>Open →</span>
-                    </button>
+                    <div key={batch.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button onClick={() => { setActiveBatch(batch); loadBatchListings(batch.id); setView('batch-detail'); }} style={{
+                        background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 8,
+                        padding: '12px 16px', cursor: 'pointer', textAlign: 'left', flex: 1,
+                        display: 'flex', alignItems: 'center', gap: 12,
+                      }}>
+                        <DiffBadge difficulty={batch.difficulty} />
+                        <span style={{ fontSize: 13, color: '#555', flex: 1 }}>
+                          {[batch.comments, batch.description].filter(Boolean).join(' — ') || <em style={{ color: '#bbb' }}>No details</em>}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#bbb' }}>{formatTime(batch.created_at)}</span>
+                        <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>Open →</span>
+                      </button>
+                      <button onClick={() => handleDeleteBatch(batch.id)} style={{ background: 'none', border: '1px solid #e8c0c0', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', color: '#c0392b', fontSize: 13, whiteSpace: 'nowrap' }}>✕</button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -532,12 +583,16 @@ export default function Dashboard({ profile, _debug }) {
                 </div>
               )}
 
-              {historyLoading ? (
-                <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading…</p>
-              ) : filteredHistory.length === 0 ? (
-                <p style={{ color: '#999', fontSize: 13 }}>No listings found.</p>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
+              {historyLoading && <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading…</p>}
+              {!historyLoading && filteredHistory.length === 0 && <p style={{ color: '#999', fontSize: 13 }}>No listings found.</p>}
+              {!historyLoading && filteredHistory.length > 0 && (
+              <div>
+                <div ref={topScrollRef} onScroll={e => { if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+                  style={{ overflowX: 'auto', overflowY: 'hidden', borderBottom: '1px solid #eee' }}>
+                  <div style={{ height: 8, minWidth: 1400 }} />
+                </div>
+                <div ref={scrollRef} onScroll={e => { if (topScrollRef.current) topScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+                  style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: '#f0f4f0' }}>
@@ -547,12 +602,12 @@ export default function Dashboard({ profile, _debug }) {
                         <th style={thStyle}>Batch</th>
                         <th style={thStyle}>Photos / Batch</th>
                         {CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}
-                        <th style={thStyle}>Note</th>
+                        <th style={thStyle}>Mgr Note</th>
                         <th style={thStyle}></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredHistory.map((l, i) => {
+                      {paginatedHistory.map((l, i) => {
                         const hasNote = l.manager_note && !l.note_resolved;
                         const rowBg = hasNote
                           ? (l.note_priority ? '#fffbf0' : '#fffff4')
@@ -582,11 +637,14 @@ export default function Dashboard({ profile, _debug }) {
                                 </button>
                               ) : <span style={{ color: '#ddd' }}>—</span>}
                             </td>
-                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                              <button onClick={() => handleDeleteHistoryListing(l.id)} style={{
-                                background: 'none', border: '1px solid #e8c0c0', borderRadius: 5,
-                                padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b',
-                              }} title="Delete listing">Delete</button>
+                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button onClick={() => { setEditTarget(l); setEditForm({ serial_id: l.serial_id, metafields: l.metafields, title: l.title, price: l.price, photographs: l.photographs, specifications: l.specifications, serial_id_checked: l.serial_id_checked, condition: l.condition }); }} style={{ background: 'none', border: '1px solid #c5d3f5', borderRadius: 5, padding: '2px 7px', fontSize: 11, cursor: 'pointer', color: '#1a56db' }}>Edit</button>
+                                <button onClick={() => { setEmpNoteTarget(l); setEmpNoteText(l.employee_note || ''); }} style={{ background: l.employee_note ? '#e8f0fe' : 'none', border: `1px solid ${l.employee_note ? '#c5d3f5' : '#ddd'}`, borderRadius: 5, padding: '2px 7px', fontSize: 11, cursor: 'pointer', color: l.employee_note ? '#1a56db' : '#888', whiteSpace: 'nowrap' }}>
+                                  {l.employee_note ? '✏ Note' : '+ Note'}
+                                </button>
+                                <button onClick={() => handleDeleteHistoryListing(l.id)} style={{ background: 'none', border: '1px solid #e8c0c0', borderRadius: 5, padding: '2px 7px', fontSize: 11, cursor: 'pointer', color: '#c0392b' }}>Del</button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -594,6 +652,14 @@ export default function Dashboard({ profile, _debug }) {
                     </tbody>
                   </table>
                 </div>
+                {totalHistoryPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 0', borderTop: '1px solid #eee' }}>
+                    <button onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage === 1} style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: historyPage === 1 ? 'not-allowed' : 'pointer', color: historyPage === 1 ? '#ccc' : '#444', fontWeight: 600, fontSize: 12 }}>← Prev</button>
+                    <span style={{ fontSize: 13, color: '#666' }}>Page {historyPage} of {totalHistoryPages}</span>
+                    <button onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))} disabled={historyPage === totalHistoryPages} style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: historyPage === totalHistoryPages ? 'not-allowed' : 'pointer', color: historyPage === totalHistoryPages ? '#ccc' : '#444', fontWeight: 600, fontSize: 12 }}>Next →</button>
+                  </div>
+                )}
+              </div>
               )}
             </div>
           )}
@@ -638,6 +704,55 @@ export default function Dashboard({ profile, _debug }) {
                 <button type="submit" disabled={batchCreating} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: batchCreating ? '#aaa' : GREEN, color: '#fff', cursor: batchCreating ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
                   {batchCreating ? 'Creating…' : 'Start Batch'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit listing modal */}
+      {editTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => e.target === e.currentTarget && setEditTarget(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 480, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16 }}>Edit Listing</h2>
+            <form onSubmit={handleSaveEdit}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Serial ID</label>
+                <input type="text" required value={editForm.serial_id} onChange={e => setEditForm(f => ({ ...f, serial_id: e.target.value }))} style={inputStyle} />
+              </div>
+              <label style={labelStyle}>Checklist</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, marginBottom: 18 }}>
+                {CHECKLIST.map(({ key, label }) => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, background: editForm[key] ? '#e8f5ee' : '#f5f5f5', border: `1.5px solid ${editForm[key] ? GREEN : '#d0d0d0'}`, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    <input type="checkbox" checked={editForm[key] || false} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.checked }))} style={{ accentColor: GREEN }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setEditTarget(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={editSaving} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: editSaving ? '#aaa' : GREEN, color: '#fff', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>{editSaving ? 'Saving…' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Employee note to manager modal */}
+      {empNoteTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => { if (e.target === e.currentTarget) { setEmpNoteTarget(null); setEmpNoteText(''); } }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Note to Manager</h2>
+            <p style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>{empNoteTarget.serial_id}</p>
+            <form onSubmit={handleSaveEmpNote}>
+              <textarea value={empNoteText} onChange={e => setEmpNoteText(e.target.value)} rows={4} autoFocus
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
+                placeholder="Leave a note for your manager…" />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+                <button type="button" onClick={() => { setEmpNoteTarget(null); setEmpNoteText(''); }} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={empNoteSaving} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: empNoteSaving ? '#aaa' : GREEN, color: '#fff', cursor: empNoteSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>{empNoteSaving ? 'Saving…' : 'Send Note'}</button>
               </div>
             </form>
           </div>
