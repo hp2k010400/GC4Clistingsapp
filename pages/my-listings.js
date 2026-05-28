@@ -173,7 +173,7 @@ export default function MyListings({ profile, _debug }) {
   async function handleListingSubmit(e) {
     e.preventDefault();
     if (!form.serial_id.trim()) { setError('Serial ID is required.'); return; }
-    if (!CHECKLIST.every(c => form[c.key])) { setError('All checklist items must be ticked before submitting.'); return; }
+    if (profile.mandatory_checklist && !CHECKLIST.every(c => form[c.key])) { setError('All checklist items must be ticked before submitting.'); return; }
     setError('');
     setSubmitting(true);
     const { error: err } = await supabase.from('listings').insert({

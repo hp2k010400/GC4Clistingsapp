@@ -112,6 +112,11 @@ export default function Admin({ profile }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  async function handleToggleChecklist(emp) {
+    await supabase.from('profiles').update({ mandatory_checklist: !emp.mandatory_checklist }).eq('id', emp.id);
+    loadData();
+  }
+
   async function handleResetPassword(e) {
     e.preventDefault();
     setResetError('');
@@ -390,14 +395,14 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Complete', ''].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Complete', 'Checklist', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                    <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
                   ) : employeeSummary.map(({ emp, count, complete }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>
@@ -415,6 +420,16 @@ export default function Admin({ profile }) {
                         <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
                       </td>
                       <td style={tdStyle}>
+                        <button onClick={() => handleToggleChecklist(emp)} style={{
+                          background: emp.mandatory_checklist ? '#d4edda' : '#f0f0f0',
+                          border: `1px solid ${emp.mandatory_checklist ? '#c3e6cb' : '#ddd'}`,
+                          borderRadius: 5, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+                          color: emp.mandatory_checklist ? '#155724' : '#888', fontWeight: 700, whiteSpace: 'nowrap',
+                        }}>
+                          {emp.mandatory_checklist ? 'Required' : 'Optional'}
+                        </button>
+                      </td>
+                      <td style={tdStyle}>
                         <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
                           background: 'none', border: '1px solid #ddd', borderRadius: 5,
                           padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
@@ -430,6 +445,7 @@ export default function Admin({ profile }) {
                       <td style={tdStyle}></td>
                       <td style={{ ...tdStyle, fontSize: 15, color: GREEN }}>{employeeSummary.reduce((s, e) => s + e.count, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
+                      <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
                     </tr>
                   </tfoot>
