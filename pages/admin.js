@@ -105,7 +105,7 @@ export default function Admin({ profile }) {
     }
     let q = supabase
       .from('listings')
-      .select('*, profiles(full_name, location), batches(difficulty, comments, photo_urls)')
+      .select('*, profiles(full_name, location), batches(difficulty, comments, description, photo_urls)')
       .order('created_at', { ascending: false });
     if (fromDate) q = q.gte('date', fromDate);
 
@@ -235,7 +235,7 @@ export default function Admin({ profile }) {
       l.specifications ? 'Yes' : 'No',
       l.serial_id_checked ? 'Yes' : 'No',
       l.condition ? 'Yes' : 'No',
-      l.batches?.comments || '',
+      [l.batches?.comments, l.batches?.description].filter(Boolean).join(' — '),
       l.batches?.difficulty || '',
       l.manager_note || '',
     ]);
@@ -674,7 +674,7 @@ export default function Admin({ profile }) {
                           </td>
                         ))}
                         <td style={{ ...tdStyle, color: '#666', minWidth: 120 }}>
-                          {l.batches?.comments || ''}
+                          {[l.batches?.comments, l.batches?.description].filter(Boolean).join(' — ')}
                         </td>
                         <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
                         <td style={tdStyle}>
@@ -913,7 +913,7 @@ export default function Admin({ profile }) {
                                 <td colSpan={10} style={{ padding: '7px 12px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <DiffBadge difficulty={batch.difficulty} />
-                                    {batch.comments && <span style={{ fontSize: 12, color: '#555' }}>{batch.comments}</span>}
+                                    {(batch.comments || batch.description) && <span style={{ fontSize: 12, color: '#555' }}>{[batch.comments, batch.description].filter(Boolean).join(' — ')}</span>}
                                     {batch.photo_urls?.length > 0 && (
                                       <div style={{ display: 'flex', gap: 3, marginLeft: 4 }}>
                                         {batch.photo_urls.map((url, idx) => (

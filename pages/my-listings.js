@@ -34,7 +34,7 @@ const EMPTY_FORM = {
   condition: false,
 };
 
-const EMPTY_BATCH = { difficulty: '', comments: '' };
+const EMPTY_BATCH = { difficulty: '', comments: '', description: '' };
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -145,7 +145,7 @@ export default function MyListings({ profile, _debug }) {
     } else if (historyFilter === 'month') {
       from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
     }
-    let query = supabase.from('listings').select('*, batches(difficulty, comments)').eq('user_id', profile.id).order('created_at', { ascending: false });
+    let query = supabase.from('listings').select('*, batches(difficulty, comments, description)').eq('user_id', profile.id).order('created_at', { ascending: false });
     if (from) query = query.gte('date', from);
     const { data } = await query;
     setHistoryListings(data || []);
@@ -163,6 +163,7 @@ export default function MyListings({ profile, _debug }) {
     const { data: batch, error: err } = await supabase.from('batches').insert({
       user_id: profile.id, date: today(), difficulty: batchForm.difficulty,
       comments: batchForm.comments.trim() || null,
+      description: batchForm.description.trim() || null,
     }).select().single();
     setBatchCreating(false);
     if (err) { setBatchError('Failed to create batch. Try again.'); return; }
@@ -314,7 +315,7 @@ export default function MyListings({ profile, _debug }) {
                   {batches.map(batch => (
                     <button key={batch.id} onClick={() => { setActiveBatch(batch); loadBatchListings(batch.id); setView('batch-detail'); }} style={{ background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 8, padding: '12px 16px', cursor: 'pointer', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 12 }}>
                       <DiffBadge difficulty={batch.difficulty} />
-                      <span style={{ fontSize: 13, color: '#555', flex: 1 }}>{batch.comments || <em style={{ color: '#bbb' }}>No comments</em>}</span>
+                      <span style={{ fontSize: 13, color: '#555', flex: 1 }}>{[batch.comments, batch.description].filter(Boolean).join(' — ') || <em style={{ color: '#bbb' }}>No details</em>}</span>
                       <span style={{ fontSize: 12, color: '#bbb' }}>{formatTime(batch.created_at)}</span>
                       <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>Open →</span>
                     </button>
@@ -331,6 +332,7 @@ export default function MyListings({ profile, _debug }) {
                   <button onClick={() => { setView('batches'); setActiveBatch(null); setForm(EMPTY_FORM); setError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 13, padding: 0, fontWeight: 600 }}>← Batches</button>
                   <DiffBadge difficulty={activeBatch.difficulty} />
                   {activeBatch.comments && <span style={{ fontSize: 13, color: '#555' }}>{activeBatch.comments}</span>}
+                  {activeBatch.description && <span style={{ fontSize: 13, color: '#555' }}>{activeBatch.description}</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: '#555' }}>{batchListings.length} listing{batchListings.length !== 1 ? 's' : ''} in this batch</span>
                 </div>
               </div>
@@ -434,7 +436,7 @@ export default function MyListings({ profile, _debug }) {
                             <td style={tdStyle}>{formatTime(l.created_at)}</td>
                             <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
                             <td style={tdStyle}>{l.batches ? <DiffBadge difficulty={l.batches.difficulty} /> : '—'}</td>
-                            <td style={{ ...tdStyle, color: '#555', fontSize: 12 }}>{l.batches?.comments || '—'}</td>
+                            <td style={{ ...tdStyle, color: '#555', fontSize: 12 }}>{[l.batches?.comments, l.batches?.description].filter(Boolean).join(' — ') || '—'}</td>
                             {CHECKLIST.map(c => <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>{l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}</td>)}
                             <td style={tdStyle}>
                               {l.manager_note ? (
@@ -501,9 +503,13 @@ export default function MyListings({ profile, _debug }) {
                   ))}
                 </div>
               </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Batch Reference</label>
+                <input type="text" value={batchForm.comments} onChange={e => setBatchForm(f => ({ ...f, comments: e.target.value }))} style={inputStyle} placeholder="e.g. 28/05 Batch 1 M2" />
+              </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Photos / Batch</label>
-                <textarea value={batchForm.comments} onChange={e => setBatchForm(f => ({ ...f, comments: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} placeholder="e.g. 27/05 Batch 1 M5" />
+                <label style={labelStyle}>Description</label>
+                <input type="text" value={batchForm.description} onChange={e => setBatchForm(f => ({ ...f, description: e.target.value }))} style={inputStyle} placeholder="e.g. Taylormade Woods" />
               </div>
               {batchError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{batchError}</p>}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
