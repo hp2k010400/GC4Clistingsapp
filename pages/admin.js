@@ -654,7 +654,7 @@ export default function Admin({ profile }) {
                     ) : filteredListings.map((l, i) => (
                       <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee', verticalAlign: 'top' }}>
                         <td style={tdStyle}>
-                          <div style={{ fontWeight: 600 }}>{l.date}</div>
+                          <div style={{ fontWeight: 600 }}>{l.date.split('-').reverse().join('/')}</div>
                           <div style={{ fontSize: 11, color: '#888' }}>{formatTime(l.created_at)}</div>
                         </td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.profiles?.full_name}</td>
@@ -667,7 +667,7 @@ export default function Admin({ profile }) {
                               : <span style={{ color: '#ddd' }}>–</span>}
                           </td>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, color: '#666', minWidth: 120 }}>
                           {l.batches?.comments || ''}
                         </td>
                         <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
