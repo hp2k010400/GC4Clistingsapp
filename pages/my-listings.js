@@ -372,7 +372,7 @@ export default function MyListings({ profile, _debug }) {
               {historyLoading ? <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading…</p> : filteredHistory.length === 0 ? <p style={{ color: '#999', fontSize: 13 }}>No listings found.</p> : (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead><tr style={{ background: '#f0f4f0' }}><th style={thStyle}>Date</th><th style={thStyle}>Time</th><th style={thStyle}>Serial ID</th><th style={thStyle}>Batch</th>{CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}</tr></thead>
+                    <thead><tr style={{ background: '#f0f4f0' }}><th style={thStyle}>Date</th><th style={thStyle}>Time</th><th style={thStyle}>Serial ID</th><th style={thStyle}>Batch</th><th style={thStyle}>Photos / Batch</th>{CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}</tr></thead>
                     <tbody>
                       {filteredHistory.map((l, i) => (
                         <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
@@ -380,6 +380,7 @@ export default function MyListings({ profile, _debug }) {
                           <td style={tdStyle}>{formatTime(l.created_at)}</td>
                           <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
                           <td style={tdStyle}>{l.batches ? <DiffBadge difficulty={l.batches.difficulty} /> : '—'}</td>
+                          <td style={{ ...tdStyle, color: '#555', fontSize: 12 }}>{l.batches?.comments || '—'}</td>
                           {CHECKLIST.map(c => <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>{l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}</td>)}
                         </tr>
                       ))}

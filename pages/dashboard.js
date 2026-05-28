@@ -485,6 +485,7 @@ export default function Dashboard({ profile, _debug }) {
                         <th style={thStyle}>Time</th>
                         <th style={thStyle}>Serial ID</th>
                         <th style={thStyle}>Batch</th>
+                        <th style={thStyle}>Photos / Batch</th>
                         {CHECKLIST.map(c => <th key={c.key} style={thStyle}>{c.label}</th>)}
                       </tr>
                     </thead>
@@ -495,6 +496,7 @@ export default function Dashboard({ profile, _debug }) {
                           <td style={tdStyle}>{formatTime(l.created_at)}</td>
                           <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
                           <td style={tdStyle}>{l.batches ? <DiffBadge difficulty={l.batches.difficulty} /> : '—'}</td>
+                          <td style={{ ...tdStyle, color: '#555', fontSize: 12 }}>{l.batches?.comments || '—'}</td>
                           {CHECKLIST.map(c => (
                             <td key={c.key} style={{ ...tdStyle, textAlign: 'center' }}>
                               {l[c.key] ? <span style={{ color: GREEN, fontWeight: 700, fontSize: 15 }}>✓</span> : <span style={{ color: '#ccc' }}>–</span>}
