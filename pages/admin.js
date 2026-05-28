@@ -296,6 +296,22 @@ export default function Admin({ profile }) {
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
             }}>+ Add Employee</button>
+            <button onClick={async () => {
+              const pw = window.prompt('New password for ALL accounts:');
+              if (!pw) return;
+              const { data: { session: sess } } = await supabase.auth.getSession();
+              const res = await fetch('/api/admin/reset-all-passwords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` },
+                body: JSON.stringify({ password: pw }),
+              });
+              const data = await res.json();
+              if (res.ok) alert(`Done — ${data.total} accounts updated, ${data.failed} failed.`);
+              else alert('Error: ' + data.error);
+            }} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}>Reset All Passwords</button>
             <span style={{ opacity: 0.85 }}>{profile.full_name}</span>
             <button onClick={handleLogout} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
