@@ -122,7 +122,12 @@ export default function Admin({ profile }) {
   useEffect(() => { loadData(); }, [loadData]);
 
   async function handleToggleChecklist(emp) {
-    await supabase.from('profiles').update({ mandatory_checklist: !emp.mandatory_checklist }).eq('id', emp.id);
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    await fetch('/api/admin/toggle-checklist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` },
+      body: JSON.stringify({ userId: emp.id, mandatory_checklist: !emp.mandatory_checklist }),
+    });
     loadData();
   }
 
