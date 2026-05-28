@@ -602,7 +602,7 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Time', 'Employee', 'Location', 'Batch', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Batch Comments', 'Photos', 'Manager Note'].map(h => (
+                      {['Time', 'Employee', 'Location', 'Difficulty', 'Photos / Batch', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos', 'Manager Note'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
@@ -616,6 +616,9 @@ export default function Admin({ profile }) {
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.profiles?.full_name}</td>
                         <td style={tdStyle}>{l.profiles?.location}</td>
                         <td style={tdStyle}><DiffBadge difficulty={l.batches?.difficulty} /></td>
+                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.batches?.comments || ''}
+                        </td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
                         {CHECKLIST.map(c => (
                           <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
@@ -624,9 +627,6 @@ export default function Admin({ profile }) {
                               : <span style={{ color: '#ddd' }}>–</span>}
                           </td>
                         ))}
-                        <td style={{ ...tdStyle, color: '#666', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {l.batches?.comments || ''}
-                        </td>
                         <td style={tdStyle}>
                           {l.batches?.photo_urls?.length > 0 ? (
                             <div style={{ display: 'flex', gap: 3 }}>
