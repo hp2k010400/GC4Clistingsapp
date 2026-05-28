@@ -4,7 +4,7 @@ let tokenExpiry = 0;
 async function getAccessToken() {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
 
-  const store = process.env.SHOPIFY_LISTINGS_STORE;
+  const store = process.env.SHOPIFY_LISTINGS_STORE || process.env.SHOPIFY_STORE;
   const clientId = process.env.SHOPIFY_LISTINGS_CLIENT_ID;
   const clientSecret = process.env.SHOPIFY_LISTINGS_CLIENT_SECRET;
 
@@ -61,6 +61,7 @@ export default async function handler(req, res) {
       image: variant.product.featuredImage?.url || null,
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    const store = process.env.SHOPIFY_LISTINGS_STORE || process.env.SHOPIFY_STORE;
+    return res.status(500).json({ error: err.message, store: store || 'MISSING', hasClientId: !!process.env.SHOPIFY_LISTINGS_CLIENT_ID, hasClientSecret: !!process.env.SHOPIFY_LISTINGS_CLIENT_SECRET });
   }
 }
