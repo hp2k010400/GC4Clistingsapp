@@ -22,6 +22,7 @@ export default async function handler(req, res) {
                 sku
                 product {
                   title
+                  productType
                   featuredImage { url }
                 }
               }
@@ -39,6 +40,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       title: node.product.title,
       price: node.price,
+      product_type: node.product.productType || null,
       image: node.product.featuredImage?.url || null,
     });
   } catch (err) {

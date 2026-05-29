@@ -210,11 +210,13 @@ export default function Dashboard({ profile, _debug }) {
     setError('');
     setSubmitting(true);
     let listing_value = null;
+    let product_type = null;
     try {
       const priceRes = await fetch(`/api/shopify/product?barcode=${encodeURIComponent(form.serial_id.trim())}`);
       if (priceRes.ok) {
         const priceData = await priceRes.json();
         if (priceData.price) listing_value = parseFloat(priceData.price);
+        if (priceData.product_type) product_type = priceData.product_type;
       }
     } catch {}
     const { error: err } = await supabase.from('listings').insert({
@@ -224,6 +226,7 @@ export default function Dashboard({ profile, _debug }) {
       ...form,
       serial_id: form.serial_id.trim(),
       listing_value,
+      product_type,
     });
     if (err) { setError('Failed to save listing. Try again.'); setSubmitting(false); return; }
     setForm(EMPTY_FORM);

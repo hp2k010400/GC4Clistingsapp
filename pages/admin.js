@@ -726,14 +726,14 @@ export default function Admin({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f0f4f0' }}>
-                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note', 'Emp Note', ''].map(h => (
+                      {['Date / Time', 'Employee', 'Location', 'Serial ID', 'Value', 'Type', 'Metafields', 'Title', 'Price', 'Pic ✓', 'Specs', 'Serial ✓', 'Condition', 'Photos / Batch', 'Difficulty', 'Manager Note', 'Emp Note', ''].map(h => (
                         <th key={h} style={{ ...thStyle, textAlign: h === 'Photos / Batch' ? 'center' : 'left' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedListings.length === 0 ? (
-                      <tr><td colSpan={16} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
+                      <tr><td colSpan={18} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No listings for this date / location.</td></tr>
                     ) : paginatedListings.map((l, i) => (
                       <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee', verticalAlign: 'top' }}>
                         <td style={tdStyle}>
@@ -743,6 +743,8 @@ export default function Admin({ profile }) {
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.profiles?.full_name}</td>
                         <td style={tdStyle}>{l.profiles?.location}</td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                        <td style={{ ...tdStyle, color: GREEN, fontWeight: 700 }}>{l.listing_value ? formatValue(l.listing_value) : <span style={{ color: '#ddd' }}>—</span>}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: '#555', whiteSpace: 'nowrap' }}>{l.product_type || <span style={{ color: '#ddd' }}>—</span>}</td>
                         {CHECKLIST.map(c => (
                           <td key={c} style={{ ...tdStyle, textAlign: 'center' }}>
                             {l[c]
