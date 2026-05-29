@@ -18,7 +18,13 @@ export default async function handler(req, res) {
     const tagData = await tagRes.json();
     const product = tagData.products?.[0];
 
-    if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (!product) return res.status(404).json({
+      error: 'Product not found',
+      searched: barcode,
+      count: tagData.products?.length,
+      shopify_status: tagRes.status,
+      raw: tagData,
+    });
 
     const variant = product.variants?.[0];
 
