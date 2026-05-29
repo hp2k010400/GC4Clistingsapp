@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     );
     const variantData = await variantRes.json();
     const variant = variantData.variants?.[0];
-    if (!variant) return res.status(404).json({ error: 'Product not found' });
+    if (!variant) return res.status(404).json({ error: 'Product not found', count: variantData.variants?.length, raw: variantData });
 
     const productRes = await fetch(
       `https://${store}/admin/api/2024-04/products/${variant.product_id}.json?fields=id,title,images`,
