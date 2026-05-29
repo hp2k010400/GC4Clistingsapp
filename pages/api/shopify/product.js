@@ -7,30 +7,25 @@ export default async function handler(req, res) {
 
   if (!token) return res.status(500).json({ error: 'SHOPIFY_LISTINGS_ACCESS_TOKEN not set in Netlify env vars' });
 
-  async function queryVariant(queryStr) {
-    const res = await fetch(`https://${store}/admin/api/2024-04/graphql.json`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-      body: JSON.stringify({
-        query: `{ productVariants(first: 1, query: "${queryStr}") { edges { node { price sku barcode product { title featuredImage { url } } } } } }`,
-      }),
-    });
-    const data = await res.json();
-    return data?.data?.productVariants?.edges?.[0]?.node || null;
-  }
-
   try {
-    // Try barcode first, then SKU (exact), then SKU with number prefix pattern
-    let variant = await queryVariant(`barcode:${barcode}`);
-    if (!variant) variant = await queryVariant(`sku:${barcode}`);
-    if (!variant) variant = await queryVariant(`sku:*${barcode}*`);
+    const headers = { 'X-Shopify-Access-Token': token };
 
-    if (!variant) return res.status(404).json({ error: 'Product not found' });
+    // Search by tag (most reliable — serial ID is always stored as a Shopify tag)
+    const tagRes = await fetch(
+      `https://${store}/admin/api/2024-04/products.json?tag=${encodeURIComponent(barcode)}&fields=id,title,variants,images&limit=1`,
+      { headers }
+    );
+    const tagData = await tagRes.json();
+    const product = tagData.products?.[0];
+
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const variant = product.variants?.[0];
 
     return res.status(200).json({
-      title: variant.product.title,
-      price: variant.price,
-      image: variant.product.featuredImage?.url || null,
+      title: product.title,
+      price: variant?.price || null,
+      image: product.images?.[0]?.src || null,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
