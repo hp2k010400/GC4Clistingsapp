@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
     // Search by tag (most reliable — serial ID is always stored as a Shopify tag)
     const tagRes = await fetch(
-      `https://${store}/admin/api/2024-04/products.json?tag=${encodeURIComponent(barcode)}&fields=id,title,variants,images&limit=1&status=any`,
+      `https://${store}/admin/api/2026-04/products.json?tag=${encodeURIComponent(barcode)}&fields=id,title,variants,images&limit=1&status=any`,
       { headers }
     );
     const tagData = await tagRes.json();
