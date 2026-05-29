@@ -8,35 +8,25 @@ export default async function handler(req, res) {
   if (!token) return res.status(500).json({ error: 'SHOPIFY_LISTINGS_ACCESS_TOKEN not set in Netlify env vars' });
 
   try {
-    const gqlRes = await fetch(`https://${store}/admin/api/2024-04/graphql.json`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-      body: JSON.stringify({
-        query: `{
-          productVariants(first: 1, query: "barcode:${barcode}") {
-            edges {
-              node {
-                price
-                product {
-                  title
-                  featuredImage { url }
-                }
-              }
-            }
-          }
-        }`,
-      }),
-    });
-
-    const gqlData = await gqlRes.json();
-    const variant = gqlData?.data?.productVariants?.edges?.[0]?.node;
-
+    const variantRes = await fetch(
+      `https://${store}/admin/api/2024-04/variants.json?barcode=${encodeURIComponent(barcode)}&fields=id,price,product_id`,
+      { headers: { 'X-Shopify-Access-Token': token } }
+    );
+    const variantData = await variantRes.json();
+    const variant = variantData.variants?.[0];
     if (!variant) return res.status(404).json({ error: 'Product not found' });
 
+    const productRes = await fetch(
+      `https://${store}/admin/api/2024-04/products/${variant.product_id}.json?fields=id,title,images`,
+      { headers: { 'X-Shopify-Access-Token': token } }
+    );
+    const productData = await productRes.json();
+    const product = productData.product;
+
     return res.status(200).json({
-      title: variant.product.title,
+      title: product.title,
       price: variant.price,
-      image: variant.product.featuredImage?.url || null,
+      image: product.images?.[0]?.src || null,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
