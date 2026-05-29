@@ -384,7 +384,7 @@ export default function Admin({ profile }) {
 
           {/* Location cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-            {locationSummary.map(({ loc, todayCount, weekCount }) => (
+            {locationSummary.map(({ loc, todayCount, weekCount, todayValue, weekValue }) => (
               <div key={loc} style={{
                 background: '#fff', borderRadius: 10, padding: '14px 16px',
                 boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
