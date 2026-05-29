@@ -43,6 +43,11 @@ function formatTime(isoStr) {
   return new Date(isoStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatValue(v) {
+  if (!v) return '£0';
+  return `£${Number(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function downloadCSV(filename, headers, rows) {
   const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\r\n');
@@ -294,9 +299,15 @@ export default function Admin({ profile }) {
 
   // Location summary cards (always today vs this week from loaded data)
   const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'].map(loc => {
-    const todayCount = listings.filter(l => l.date === todayStr && l.profiles?.location === loc).length;
-    const weekCount = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc).length;
-    return { loc, todayCount, weekCount };
+    const todayListings = listings.filter(l => l.date === todayStr && l.profiles?.location === loc);
+    const weekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc);
+    return {
+      loc,
+      todayCount: todayListings.length,
+      weekCount: weekListings.length,
+      todayValue: todayListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+      weekValue: weekListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+    };
   });
 
   // Employee summary for selected period
@@ -311,7 +322,12 @@ export default function Admin({ profile }) {
     });
     const batches = { easy: 0, medium: 0, hard: 0 };
     Object.values(batchMap).forEach(d => { if (d in batches) batches[d]++; });
-    return { emp, count: empListings.length, complete, batches };
+    const totalValue = empListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0);
+    const times = empListings.map(l => new Date(l.created_at).getTime()).sort((a, b) => a - b);
+    const hours = times.length > 1 ? (times[times.length - 1] - times[0]) / (1000 * 60 * 60) : 0;
+    const listingsPerHour = hours > 0 ? empListings.length / hours : 0;
+    const valuePerHour = hours > 0 ? totalValue / hours : 0;
+    return { emp, count: empListings.length, complete, batches, totalValue, listingsPerHour, valuePerHour };
   }).filter(e => location === 'All Locations' || e.emp.location === location);
 
   const PAGE_SIZE = 10;
@@ -377,13 +393,15 @@ export default function Admin({ profile }) {
                 <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 10 }}>{loc}</div>
                 <div style={{ display: 'flex', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: GREEN, lineHeight: 1 }}>{todayCount}</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Today</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: GREEN, lineHeight: 1 }}>{todayCount}</div>
+                    <div style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>{formatValue(todayValue)}</div>
+                    <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>Today</div>
                   </div>
                   <div style={{ width: 1, background: '#eee' }} />
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#1a1a1a', lineHeight: 1 }}>{weekCount}</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>This Week</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a', lineHeight: 1 }}>{weekCount}</div>
+                    <div style={{ fontSize: 11, color: '#555', fontWeight: 600 }}>{formatValue(weekValue)}</div>
+                    <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>This Week</div>
                   </div>
                 </div>
               </div>
@@ -396,17 +414,19 @@ export default function Admin({ profile }) {
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>Business Total</div>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
                     {locationSummary.reduce((s, l) => s + l.todayCount, 0)}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>Today</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.todayValue, 0))}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>Today</div>
                 </div>
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.25)' }} />
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
                     {locationSummary.reduce((s, l) => s + l.weekCount, 0)}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>This Week</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.weekValue, 0))}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>This Week</div>
                 </div>
               </div>
             </div>
@@ -598,15 +618,15 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Checklist', ''].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value', 'Listings/hr', 'Value/hr', 'Checklist', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={9} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
-                  ) : employeeSummary.map(({ emp, count, complete, batches }, i) => (
+                    <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                  ) : employeeSummary.map(({ emp, count, complete, batches, totalValue, listingsPerHour, valuePerHour }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>
                         <button onClick={() => setEmpDetail(emp)} style={{
@@ -625,6 +645,9 @@ export default function Admin({ profile }) {
                       <td style={tdStyle}>
                         <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
                       </td>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(totalValue)}</td>
+                      <td style={tdStyle}>{listingsPerHour > 0 ? listingsPerHour.toFixed(1) : '—'}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{valuePerHour > 0 ? formatValue(valuePerHour) : '—'}</td>
                       <td style={tdStyle}>
                         <button onClick={() => handleToggleChecklist(emp)} style={{
                           background: emp.mandatory_checklist ? '#d4edda' : '#f0f0f0',
@@ -670,6 +693,9 @@ export default function Admin({ profile }) {
                       <td style={{ ...tdStyle, color: '#e67e22' }}>{employeeSummary.reduce((s, e) => s + e.batches.medium, 0)}</td>
                       <td style={{ ...tdStyle, color: '#c0392b' }}>{employeeSummary.reduce((s, e) => s + e.batches.hard, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(employeeSummary.reduce((s, e) => s + e.totalValue, 0))}</td>
+                      <td style={tdStyle}></td>
+                      <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
                     </tr>

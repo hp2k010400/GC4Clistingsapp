@@ -209,12 +209,21 @@ export default function Dashboard({ profile, _debug }) {
     if (profile.mandatory_checklist && !CHECKLIST.every(c => form[c.key])) { setError('All checklist items must be ticked before submitting.'); return; }
     setError('');
     setSubmitting(true);
+    let listing_value = null;
+    try {
+      const priceRes = await fetch(`/api/shopify/product?barcode=${encodeURIComponent(form.serial_id.trim())}`);
+      if (priceRes.ok) {
+        const priceData = await priceRes.json();
+        if (priceData.price) listing_value = parseFloat(priceData.price);
+      }
+    } catch {}
     const { error: err } = await supabase.from('listings').insert({
       user_id: profile.id,
       date: today(),
       batch_id: activeBatch.id,
       ...form,
       serial_id: form.serial_id.trim(),
+      listing_value,
     });
     if (err) { setError('Failed to save listing. Try again.'); setSubmitting(false); return; }
     setForm(EMPTY_FORM);
