@@ -7,26 +7,30 @@ export default async function handler(req, res) {
 
   if (!token) return res.status(500).json({ error: 'SHOPIFY_LISTINGS_ACCESS_TOKEN not set in Netlify env vars' });
 
-  try {
-    const variantRes = await fetch(
-      `https://${store}/admin/api/2024-04/variants.json?barcode=${encodeURIComponent(barcode)}&fields=id,price,product_id`,
-      { headers: { 'X-Shopify-Access-Token': token } }
-    );
-    const variantData = await variantRes.json();
-    const variant = variantData.variants?.[0];
-    if (!variant) return res.status(404).json({ error: 'Product not found', count: variantData.variants?.length, raw: variantData });
+  async function queryVariant(queryStr) {
+    const res = await fetch(`https://${store}/admin/api/2024-04/graphql.json`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
+      body: JSON.stringify({
+        query: `{ productVariants(first: 1, query: "${queryStr}") { edges { node { price sku barcode product { title featuredImage { url } } } } } }`,
+      }),
+    });
+    const data = await res.json();
+    return data?.data?.productVariants?.edges?.[0]?.node || null;
+  }
 
-    const productRes = await fetch(
-      `https://${store}/admin/api/2024-04/products/${variant.product_id}.json?fields=id,title,images`,
-      { headers: { 'X-Shopify-Access-Token': token } }
-    );
-    const productData = await productRes.json();
-    const product = productData.product;
+  try {
+    // Try barcode first, then SKU (exact), then SKU with number prefix pattern
+    let variant = await queryVariant(`barcode:${barcode}`);
+    if (!variant) variant = await queryVariant(`sku:${barcode}`);
+    if (!variant) variant = await queryVariant(`sku:*${barcode}*`);
+
+    if (!variant) return res.status(404).json({ error: 'Product not found' });
 
     return res.status(200).json({
-      title: product.title,
+      title: variant.product.title,
       price: variant.price,
-      image: product.images?.[0]?.src || null,
+      image: variant.product.featuredImage?.url || null,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
