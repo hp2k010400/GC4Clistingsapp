@@ -5,40 +5,41 @@ export default async function handler(req, res) {
   const token = process.env.SHOPIFY_LISTINGS_ACCESS_TOKEN;
   const store = process.env.SHOPIFY_LISTINGS_STORE || process.env.SHOPIFY_STORE;
 
-  if (!token) return res.status(500).json({ error: 'SHOPIFY_LISTINGS_ACCESS_TOKEN not set in Netlify env vars' });
+  if (!token) return res.status(500).json({ error: 'SHOPIFY_LISTINGS_ACCESS_TOKEN not set' });
 
   try {
-    const headers = { 'X-Shopify-Access-Token': token };
+    const headers = { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' };
 
-    // First verify the token works at all
-    const shopRes = await fetch(`https://${store}/admin/api/2025-01/shop.json`, { headers });
-    const shopData = await shopRes.json();
-    if (!shopRes.ok) return res.status(500).json({ error: 'Token/store auth failed', shopify_status: shopRes.status, shop: shopData });
-
-    // Search by tag
-    const tagRes = await fetch(
-      `https://${store}/admin/api/2025-01/products.json?tag=${encodeURIComponent(barcode)}&fields=id,title,variants,images&limit=1`,
-      { headers }
-    );
-    const tagData = await tagRes.json();
-    const product = tagData.products?.[0];
-
-    if (!product) return res.status(404).json({
-      error: 'Product not found',
-      searched: barcode,
-      store_used: store,
-      shop_name: shopData.shop?.name,
-      count: tagData.products?.length,
-      shopify_status: tagRes.status,
-      raw: tagData,
+    const gqlRes = await fetch(`https://${store}/admin/api/2025-01/graphql.json`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: `{
+          productVariants(first: 1, query: "sku:*${barcode}*") {
+            edges {
+              node {
+                price
+                sku
+                product {
+                  title
+                  featuredImage { url }
+                }
+              }
+            }
+          }
+        }`,
+      }),
     });
 
-    const variant = product.variants?.[0];
+    const gqlData = await gqlRes.json();
+    const node = gqlData?.data?.productVariants?.edges?.[0]?.node;
+
+    if (!node) return res.status(404).json({ error: 'Product not found', gql_errors: gqlData?.errors });
 
     return res.status(200).json({
-      title: product.title,
-      price: variant?.price || null,
-      image: product.images?.[0]?.src || null,
+      title: node.product.title,
+      price: node.price,
+      image: node.product.featuredImage?.url || null,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
