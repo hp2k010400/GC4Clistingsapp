@@ -10,7 +10,12 @@ export default async function handler(req, res) {
   try {
     const headers = { 'X-Shopify-Access-Token': token };
 
-    // Search by tag (most reliable — serial ID is always stored as a Shopify tag)
+    // First verify the token works at all
+    const shopRes = await fetch(`https://${store}/admin/api/2025-01/shop.json`, { headers });
+    const shopData = await shopRes.json();
+    if (!shopRes.ok) return res.status(500).json({ error: 'Token/store auth failed', shopify_status: shopRes.status, shop: shopData });
+
+    // Search by tag
     const tagRes = await fetch(
       `https://${store}/admin/api/2025-01/products.json?tag=${encodeURIComponent(barcode)}&fields=id,title,variants,images&limit=1`,
       { headers }
@@ -22,6 +27,7 @@ export default async function handler(req, res) {
       error: 'Product not found',
       searched: barcode,
       store_used: store,
+      shop_name: shopData.shop?.name,
       count: tagData.products?.length,
       shopify_status: tagRes.status,
       raw: tagData,
