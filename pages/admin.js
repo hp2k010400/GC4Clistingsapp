@@ -24,7 +24,7 @@ function DiffBadge({ difficulty }) {
   );
 }
 
-const LOCATIONS = ['All Locations', 'Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
+const LOCATIONS = ['All Locations', 'Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'];
 const CHECKLIST = ['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'];
 
 function today() {
@@ -293,7 +293,7 @@ export default function Admin({ profile }) {
   });
 
   // Location summary cards (always today vs this week from loaded data)
-  const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'].map(loc => {
+  const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'].map(loc => {
     const todayCount = listings.filter(l => l.date === todayStr && l.profiles?.location === loc).length;
     const weekCount = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc).length;
     return { loc, todayCount, weekCount };
@@ -367,7 +367,7 @@ export default function Admin({ profile }) {
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px' }}>
 
           {/* Location cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
             {locationSummary.map(({ loc, todayCount, weekCount }) => (
               <div key={loc} style={{
                 background: '#fff', borderRadius: 10, padding: '14px 16px',
@@ -855,7 +855,7 @@ export default function Admin({ profile }) {
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Location</label>
                   <select value={newUser.location} onChange={e => setNewUser(u => ({ ...u, location: e.target.value }))} style={inputStyle}>
-                    {['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'].map(l => <option key={l}>{l}</option>)}
+                    {['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'].map(l => <option key={l}>{l}</option>)}
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
