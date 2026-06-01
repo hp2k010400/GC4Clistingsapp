@@ -303,8 +303,8 @@ export default function Admin({ profile }) {
     return true;
   });
 
-  // Location summary cards (always today vs this week from loaded data)
-  const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'].map(loc => {
+  // Location summary cards — main locations only (excludes Returns)
+  const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'].map(loc => {
     const todayListings = listings.filter(l => l.date === todayStr && l.profiles?.location === loc);
     const weekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc);
     return {
@@ -316,25 +316,41 @@ export default function Admin({ profile }) {
     };
   });
 
-  // Employee summary for selected period
-  const employeeSummary = employees.map(emp => {
+  // Returns summary (separate)
+  const returnsTodayListings = listings.filter(l => l.date === todayStr && l.profiles?.location === 'Returns');
+  const returnsWeekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === 'Returns');
+  const returnsSummary = {
+    todayCount: returnsTodayListings.length,
+    weekCount: returnsWeekListings.length,
+    todayValue: returnsTodayListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+    weekValue: returnsWeekListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+  };
+
+  function buildEmpStats(emp) {
     const empListings = overviewListings.filter(l => l.user_id === emp.id);
     const complete = empListings.filter(l => CHECKLIST.every(c => l[c])).length;
     const batchMap = {};
     empListings.forEach(l => {
-      if (l.batch_id && l.batches?.difficulty && !batchMap[l.batch_id]) {
-        batchMap[l.batch_id] = l.batches.difficulty;
-      }
+      if (l.batch_id && l.batches?.difficulty && !batchMap[l.batch_id]) batchMap[l.batch_id] = l.batches.difficulty;
     });
     const batches = { easy: 0, medium: 0, hard: 0 };
     Object.values(batchMap).forEach(d => { if (d in batches) batches[d]++; });
     const totalValue = empListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0);
     const times = empListings.map(l => new Date(l.created_at).getTime()).sort((a, b) => a - b);
     const hours = times.length > 1 ? (times[times.length - 1] - times[0]) / (1000 * 60 * 60) : 0;
-    const listingsPerHour = hours > 0 ? empListings.length / hours : 0;
-    const valuePerHour = hours > 0 ? totalValue / hours : 0;
-    return { emp, count: empListings.length, complete, batches, totalValue, listingsPerHour, valuePerHour };
-  }).filter(e => location === 'All Locations' || e.emp.location === location);
+    return { emp, count: empListings.length, complete, batches, totalValue, listingsPerHour: hours > 0 ? empListings.length / hours : 0, valuePerHour: hours > 0 ? totalValue / hours : 0 };
+  }
+
+  // Main employee summary (excludes Returns)
+  const employeeSummary = employees
+    .filter(emp => emp.location !== 'Returns')
+    .map(buildEmpStats)
+    .filter(e => location === 'All Locations' || e.emp.location === location);
+
+  // Returns employee summary (separate)
+  const returnsEmployeeSummary = employees
+    .filter(emp => emp.location === 'Returns')
+    .map(buildEmpStats);
 
   const PAGE_SIZE = 10;
   const totalListingsPages = Math.ceil(filteredListings.length / PAGE_SIZE);
@@ -724,6 +740,62 @@ export default function Admin({ profile }) {
                 )}
               </table>
             </div>
+
+            {/* Returns section */}
+            {(location === 'All Locations' || location === 'Returns') && returnsEmployeeSummary.length > 0 && (
+              <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden', marginTop: 16, borderTop: '3px solid #e67e22' }}>
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontWeight: 800, fontSize: 14, color: '#e67e22' }}>Returns</span>
+                  <span style={{ fontSize: 12, color: '#888' }}>Tracked separately — not included in main totals</span>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, color: '#666' }}>
+                    <span>Today: <b>{returnsSummary.todayCount}</b></span>
+                    <span>This Week: <b>{returnsSummary.weekCount}</b></span>
+                  </div>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#fef3e2' }}>
+                      {['Employee', 'Location', 'Processed', 'Complete', 'Checklist', ''].map(h => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returnsEmployeeSummary.map(({ emp, count, complete }, i) => (
+                      <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
+                        <td style={{ ...tdStyle, fontWeight: 700 }}>{emp.full_name}</td>
+                        <td style={tdStyle}>{emp.location}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700 }}><span style={{ color: '#e67e22' }}>{count}</span></td>
+                        <td style={tdStyle}><span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span></td>
+                        <td style={tdStyle}>
+                          <button onClick={() => handleToggleChecklist(emp)} style={{
+                            background: emp.mandatory_checklist ? '#d4edda' : '#f0f0f0',
+                            border: `1px solid ${emp.mandatory_checklist ? '#c3e6cb' : '#ddd'}`,
+                            borderRadius: 5, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+                            color: emp.mandatory_checklist ? '#155724' : '#888', fontWeight: 700,
+                          }}>{emp.mandatory_checklist ? 'Required' : 'Optional'}</button>
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{ background: 'none', border: '1px solid #ddd', borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666' }}>Reset pwd</button>
+                            <select value={emp.role} onChange={async e => {
+                              const newRole = e.target.value;
+                              if (!confirm(`Change ${emp.full_name} to ${newRole}?`)) return;
+                              const { data: { session: sess } } = await supabase.auth.getSession();
+                              await fetch('/api/admin/update-role', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` }, body: JSON.stringify({ userId: emp.id, role: newRole }) });
+                              loadData();
+                            }} style={{ ...inputStyle, width: 100, fontSize: 11, padding: '3px 6px' }}>
+                              <option value="employee">Employee</option>
+                              <option value="manager">Manager</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
           ) : (
 
