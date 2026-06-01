@@ -71,6 +71,8 @@ export default function Admin({ profile }) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [overviewPeriod, setOverviewPeriod] = useState('day');
+  const [overviewFrom, setOverviewFrom] = useState(today());
+  const [overviewTo, setOverviewTo] = useState(today());
   const [listingsPeriod, setListingsPeriod] = useState('week');
   const [listingsEmployee, setListingsEmployee] = useState('');
   const [listingsSearch, setListingsSearch] = useState('');
@@ -111,6 +113,9 @@ export default function Admin({ profile }) {
     if (listingsPeriod === 'month' || overviewPeriod === 'month') {
       fromDate = monthStart;
     }
+    if (overviewPeriod === 'custom' && overviewFrom < fromDate) {
+      fromDate = overviewFrom;
+    }
     if (listingsPeriod === 'all') {
       fromDate = null;
     }
@@ -134,7 +139,7 @@ export default function Admin({ profile }) {
     setEmployees(allEmployees || []);
     setNotes(allNotes || []);
     setLoading(false);
-  }, [listingsPeriod, overviewPeriod]);
+  }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -293,6 +298,7 @@ export default function Admin({ profile }) {
     if (overviewPeriod === 'day' && l.date !== date) return false;
     if (overviewPeriod === 'week' && l.date < weekStart) return false;
     if (overviewPeriod === 'month' && l.date < monthStartStr) return false;
+    if (overviewPeriod === 'custom' && (l.date < overviewFrom || l.date > overviewTo)) return false;
     if (location !== 'All Locations' && l.profiles?.location !== location) return false;
     return true;
   });
@@ -497,6 +503,7 @@ export default function Admin({ profile }) {
                       { key: 'day', label: 'Day' },
                       { key: 'week', label: 'This Week' },
                       { key: 'month', label: 'This Month' },
+                      { key: 'custom', label: 'Custom' },
                     ].map(p => (
                       <button key={p.key} onClick={() => setOverviewPeriod(p.key)} style={{
                         padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
@@ -511,6 +518,20 @@ export default function Admin({ profile }) {
                       <label style={labelStyle}>Date</label>
                       <input type="date" value={date} onChange={e => setDate(e.target.value)}
                         style={{ ...inputStyle, width: 150 }} />
+                    </div>
+                  )}
+                  {overviewPeriod === 'custom' && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div>
+                        <label style={labelStyle}>From</label>
+                        <input type="date" value={overviewFrom} onChange={e => setOverviewFrom(e.target.value)}
+                          style={{ ...inputStyle, width: 145 }} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>To</label>
+                        <input type="date" value={overviewTo} onChange={e => setOverviewTo(e.target.value)}
+                          style={{ ...inputStyle, width: 145 }} />
+                      </div>
                     </div>
                   )}
                 </>
