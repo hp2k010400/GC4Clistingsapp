@@ -155,7 +155,7 @@ export default function MyListings({ profile, _debug }) {
     } else if (historyFilter === 'month') {
       from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
     }
-    let query = supabase.from('listings').select('*, batches(difficulty, comments, description)').eq('user_id', profile.id).order('created_at', { ascending: false });
+    let query = supabase.from('listings').select('*, batches(difficulty, comments, description)').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(500000);
     if (from) query = query.gte('date', from);
     const { data } = await query;
     setHistoryListings(data || []);
