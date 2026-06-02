@@ -122,7 +122,8 @@ export default function Admin({ profile }) {
     let q = supabase
       .from('listings')
       .select('*, profiles(full_name, location), batches(difficulty, comments, description, photo_urls)')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(10000);
     if (fromDate) q = q.gte('date', fromDate);
 
     const [{ data: allListings }, { data: allEmployees }, { data: allNotes }] = await Promise.all([
