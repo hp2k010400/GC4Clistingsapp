@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   }
 
   const validLocations = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'];
-  const validRoles = ['employee', 'manager'];
+  const validRoles = ['employee', 'manager', 'supervisor'];
   if (!validLocations.includes(location)) return res.status(400).json({ error: 'Invalid location.' });
   if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role.' });
 

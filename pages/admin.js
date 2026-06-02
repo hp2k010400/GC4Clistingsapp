@@ -391,14 +391,14 @@ export default function Admin({ profile, isReadOnly }) {
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
-            <button onClick={() => router.push('/my-listings')} style={{
+            {!isReadOnly && <button onClick={() => router.push('/my-listings')} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            }}>My Listings</button>
-            <button onClick={() => setShowCreate(true)} style={{
+            }}>My Listings</button>}
+            {!isReadOnly && <button onClick={() => setShowCreate(true)} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            }}>+ Add Employee</button>
+            }}>+ Add Employee</button>}
             <button onClick={async () => {
               const { data: { session: sess } } = await supabase.auth.getSession();
               const res = await fetch('/api/admin/send-report', {
@@ -454,17 +454,17 @@ export default function Admin({ profile, isReadOnly }) {
               <div style={{ display: 'flex', gap: 16 }}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
-                    {locationSummary.reduce((s, l) => s + l.todayCount, 0)}
+                    {locationSummary.reduce((s, l) => s + l.todayCount, 0) + returnsSummary.todayCount}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.todayValue, 0))}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.todayValue, 0) + returnsSummary.todayValue)}</div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>Today</div>
                 </div>
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.25)' }} />
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
-                    {locationSummary.reduce((s, l) => s + l.weekCount, 0)}
+                    {locationSummary.reduce((s, l) => s + l.weekCount, 0) + returnsSummary.weekCount}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.weekValue, 0))}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.weekValue, 0) + returnsSummary.weekValue)}</div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>This Week</div>
                 </div>
               </div>
@@ -672,7 +672,10 @@ export default function Admin({ profile, isReadOnly }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value', 'Checklist', ''].map(h => (
+                    {(isReadOnly
+                      ? ['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value']
+                      : ['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value', 'Checklist', '']
+                    ).map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -700,7 +703,7 @@ export default function Admin({ profile, isReadOnly }) {
                         <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
                       </td>
                       <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(totalValue)}</td>
-                      <td style={tdStyle}>
+                      {!isReadOnly && <td style={tdStyle}>
                         <button onClick={() => handleToggleChecklist(emp)} style={{
                           background: emp.mandatory_checklist ? '#d4edda' : '#f0f0f0',
                           border: `1px solid ${emp.mandatory_checklist ? '#c3e6cb' : '#ddd'}`,
@@ -709,8 +712,8 @@ export default function Admin({ profile, isReadOnly }) {
                         }}>
                           {emp.mandatory_checklist ? 'Required' : 'Optional'}
                         </button>
-                      </td>
-                      <td style={tdStyle}>
+                      </td>}
+                      {!isReadOnly && <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
                             background: 'none', border: '1px solid #ddd', borderRadius: 5,
@@ -729,9 +732,10 @@ export default function Admin({ profile, isReadOnly }) {
                           }} style={{ ...inputStyle, width: 100, fontSize: 11, padding: '3px 6px' }}>
                             <option value="employee">Employee</option>
                             <option value="manager">Manager</option>
+                            <option value="supervisor">Supervisor</option>
                           </select>
                         </div>
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                 </tbody>
@@ -841,7 +845,7 @@ export default function Admin({ profile, isReadOnly }) {
                               </span>
                             : <span style={{ color: '#ddd' }}>—</span>}
                         </td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                        {!isReadOnly && <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button onClick={() => { setEditTarget(l); setEditForm({ serial_id: l.serial_id, metafields: l.metafields, title: l.title, price: l.price, photographs: l.photographs, specifications: l.specifications, serial_id_checked: l.serial_id_checked, condition: l.condition }); }} style={{
                               background: 'none', border: '1px solid #c5d3f5', borderRadius: 5,
@@ -852,7 +856,7 @@ export default function Admin({ profile, isReadOnly }) {
                               padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b',
                             }}>Delete</button>
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                     ))}
                   </tbody>
@@ -1229,9 +1233,9 @@ export async function getServerSideProps({ req, res }) {
     .eq('id', session.user.id)
     .single();
 
-  if (!profile || profile.role !== 'manager') {
+  if (!profile || (profile.role !== 'manager' && profile.role !== 'supervisor')) {
     return { redirect: { destination: '/dashboard', permanent: false } };
   }
 
-  return { props: { profile } };
+  return { props: { profile, isReadOnly: profile.role === 'supervisor' } };
 }

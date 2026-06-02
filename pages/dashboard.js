@@ -849,7 +849,7 @@ export async function getServerSideProps({ req, res }) {
   const { data: profile, error: profileError } = await admin
     .from('profiles').select('*').eq('id', session.user.id).single();
 
-  if (profile?.role === 'manager') return { redirect: { destination: '/admin', permanent: false } };
+  if (profile?.role === 'manager' || profile?.role === 'supervisor') return { redirect: { destination: '/admin', permanent: false } };
 
   return {
     props: {
