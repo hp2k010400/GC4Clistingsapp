@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
-const RECIPIENTS = ['harryphee010400@gmail.com'];
+const RECIPIENTS = ['harryp010400@gmail.com'];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function getWeekStart() {
