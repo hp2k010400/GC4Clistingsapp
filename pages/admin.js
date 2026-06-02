@@ -395,6 +395,18 @@ export default function Admin({ profile }) {
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
             }}>+ Add Employee</button>
+            <button onClick={async () => {
+              const { data: { session: sess } } = await supabase.auth.getSession();
+              const res = await fetch('/api/admin/send-report', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${sess?.access_token}` },
+              });
+              const data = await res.json();
+              alert(res.ok ? 'Report sent! Check your email.' : 'Failed: ' + JSON.stringify(data));
+            }} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}>Send Test Report</button>
             <span style={{ opacity: 0.85 }}>{profile.full_name}</span>
             <button onClick={handleLogout} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
