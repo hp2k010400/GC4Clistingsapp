@@ -116,6 +116,9 @@ export default function Admin({ profile, isReadOnly }) {
     if (overviewPeriod === 'custom' && overviewFrom < fromDate) {
       fromDate = overviewFrom;
     }
+    if (overviewPeriod === 'day' && date < fromDate) {
+      fromDate = date;
+    }
     if (listingsPeriod === 'all') {
       fromDate = null;
     }
@@ -140,7 +143,7 @@ export default function Admin({ profile, isReadOnly }) {
     setEmployees(allEmployees || []);
     setNotes(allNotes || []);
     setLoading(false);
-  }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo]);
+  }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo, date]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
