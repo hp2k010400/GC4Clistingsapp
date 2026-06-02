@@ -123,7 +123,6 @@ export default function Admin({ profile, isReadOnly }) {
       .from('listings')
       .select('*, profiles(full_name, location), batches(difficulty, comments, description, photo_urls)')
       .order('created_at', { ascending: false });
-    if (listingsPeriod !== 'all') q = q.limit(10000);
     if (fromDate) q = q.gte('date', fromDate);
 
     const [{ data: allListings }, { data: allEmployees }, { data: allNotes }] = await Promise.all([
@@ -133,7 +132,8 @@ export default function Admin({ profile, isReadOnly }) {
         .select('*, profiles(full_name, location)')
         .not('manager_note', 'is', null)
         .order('note_priority', { ascending: false })
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(10000),
     ]);
 
     setListings(allListings || []);

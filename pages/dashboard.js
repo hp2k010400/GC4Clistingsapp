@@ -168,7 +168,6 @@ export default function Dashboard({ profile, _debug }) {
       .select('*, batches(difficulty, comments, description)')
       .eq('user_id', profile.id)
       .order('created_at', { ascending: false })
-      .limit(historyFilter === 'all' ? 100000 : 5000);
     if (from) query = query.gte('date', from);
     const { data } = await query;
     setHistoryListings(data || []);
