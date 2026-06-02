@@ -60,7 +60,7 @@ function downloadCSV(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
-export default function Admin({ profile }) {
+export default function Admin({ profile, isReadOnly }) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -339,7 +339,7 @@ export default function Admin({ profile }) {
     const totalValue = empListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0);
     const times = empListings.map(l => new Date(l.created_at).getTime()).sort((a, b) => a - b);
     const hours = times.length > 1 ? (times[times.length - 1] - times[0]) / (1000 * 60 * 60) : 0;
-    return { emp, count: empListings.length, complete, batches, totalValue, listingsPerHour: hours > 0 ? empListings.length / hours : 0, valuePerHour: hours > 0 ? totalValue / hours : 0 };
+    return { emp, count: empListings.length, complete, batches, totalValue };
   }
 
   // Main employee summary (excludes Returns)
@@ -668,15 +668,15 @@ export default function Admin({ profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
-                    {['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value', 'Listings/hr', 'Value/hr', 'Checklist', ''].map(h => (
+                    {['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value', 'Checklist', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {employeeSummary.length === 0 ? (
-                    <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
-                  ) : employeeSummary.map(({ emp, count, complete, batches, totalValue, listingsPerHour, valuePerHour }, i) => (
+                    <tr><td colSpan={10} style={{ padding: 20, textAlign: 'center', color: '#999' }}>No employees found.</td></tr>
+                  ) : employeeSummary.map(({ emp, count, complete, batches, totalValue }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>
                         <button onClick={() => setEmpDetail(emp)} style={{
@@ -696,8 +696,6 @@ export default function Admin({ profile }) {
                         <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
                       </td>
                       <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(totalValue)}</td>
-                      <td style={tdStyle}>{listingsPerHour > 0 ? listingsPerHour.toFixed(1) : '—'}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{valuePerHour > 0 ? formatValue(valuePerHour) : '—'}</td>
                       <td style={tdStyle}>
                         <button onClick={() => handleToggleChecklist(emp)} style={{
                           background: emp.mandatory_checklist ? '#d4edda' : '#f0f0f0',
@@ -744,8 +742,6 @@ export default function Admin({ profile }) {
                       <td style={{ ...tdStyle, color: '#c0392b' }}>{employeeSummary.reduce((s, e) => s + e.batches.hard, 0)}</td>
                       <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
                       <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(employeeSummary.reduce((s, e) => s + e.totalValue, 0))}</td>
-                      <td style={tdStyle}></td>
-                      <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
                       <td style={tdStyle}></td>
                     </tr>
