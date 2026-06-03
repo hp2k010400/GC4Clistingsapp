@@ -359,6 +359,20 @@ export default function Dashboard({ profile, _debug }) {
             </div>
           )}
 
+          {unresolvedNotesCount > 0 && view !== 'history' && (
+            <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20, lineHeight: 1 }}>⚑</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>
+                  You have {unresolvedNotesCount} unread manager note{unresolvedNotesCount !== 1 ? 's' : ''} on your listings
+                </span>
+              </div>
+              <button onClick={() => setView('history')} style={{ background: '#856404', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                View Now
+              </button>
+            </div>
+          )}
+
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', borderTop: `3px solid ${GREEN}` }}>
@@ -489,8 +503,8 @@ export default function Dashboard({ profile, _debug }) {
                       <label style={{ ...labelStyle, marginBottom: 0 }}>Checklist</label>
                       {!profile.mandatory_checklist && (
                         <button type="button" onClick={() => setForm(f => ({ ...f, ...Object.fromEntries(CHECKLIST.map(c => [c.key, true])) }))} style={{
-                          background: '#f0f4f0', border: '1px solid #c3e6cb', borderRadius: 5,
-                          padding: '2px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 700, color: GREEN,
+                          background: '#f0f4f0', border: `1.5px solid ${GREEN}`, borderRadius: 7,
+                          padding: '9px 18px', fontSize: 13, cursor: 'pointer', fontWeight: 700, color: GREEN, letterSpacing: '0.03em',
                         }}>Select All</button>
                       )}
                     </div>

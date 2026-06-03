@@ -418,8 +418,8 @@ export default function MyListings({ profile, _debug }) {
                       <label style={{ ...labelStyle, marginBottom: 0 }}>Checklist</label>
                       {!profile.mandatory_checklist && (
                         <button type="button" onClick={() => setForm(f => ({ ...f, ...Object.fromEntries(CHECKLIST.map(c => [c.key, true])) }))} style={{
-                          background: '#f0f4f0', border: '1px solid #c3e6cb', borderRadius: 5,
-                          padding: '2px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 700, color: GREEN,
+                          background: '#f0f4f0', border: `1.5px solid ${GREEN}`, borderRadius: 7,
+                          padding: '9px 18px', fontSize: 13, cursor: 'pointer', fontWeight: 700, color: GREEN, letterSpacing: '0.03em',
                         }}>Select All</button>
                       )}
                     </div>
