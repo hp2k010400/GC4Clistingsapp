@@ -145,9 +145,6 @@ export default function Lookup() {
                       <th style={thStyle}>Time</th>
                       <th style={thStyle}>Listed By</th>
                       <th style={thStyle}>Location</th>
-                      <th style={thStyle}>Product Type</th>
-                      <th style={thStyle}>Value</th>
-                      <th style={thStyle}>Checklist</th>
                       <th style={thStyle}>Batch</th>
                     </tr>
                   </thead>
@@ -161,13 +158,6 @@ export default function Lookup() {
                           <td style={tdStyle}>{formatTime(l.created_at)}</td>
                           <td style={tdStyle}>{l.profiles?.full_name || '—'}</td>
                           <td style={tdStyle}>{l.profiles?.location || '—'}</td>
-                          <td style={tdStyle}>{l.product_type || '—'}</td>
-                          <td style={{ ...tdStyle, fontWeight: 700 }}>{formatValue(l.listing_value)}</td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            {allChecked
-                              ? <span style={{ background: '#d4edda', color: '#155724', fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>Complete</span>
-                              : <span style={{ background: '#fff3cd', color: '#856404', fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>Partial</span>}
-                          </td>
                           <td style={{ ...tdStyle, fontSize: 12, color: '#666' }}>
                             {[l.batches?.comments, l.batches?.description].filter(Boolean).join(' — ') || '—'}
                           </td>
