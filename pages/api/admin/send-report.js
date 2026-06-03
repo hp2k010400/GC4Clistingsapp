@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
-const RECIPIENTS = ['harryp010400@gmail.com'];
+const RECIPIENTS = ['harry.phillips@golfclubs4cash.co.uk'];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
