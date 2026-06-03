@@ -21,7 +21,8 @@ export async function getServerSideProps({ req, res }) {
     .single();
 
   if (!profile) return { redirect: { destination: '/login', permanent: false } };
-  if (profile.role === 'manager') return { redirect: { destination: '/admin', permanent: false } };
+  if (profile.role === 'manager' || profile.role === 'supervisor') return { redirect: { destination: '/admin', permanent: false } };
+  if (profile.role === 'viewer') return { redirect: { destination: '/lookup', permanent: false } };
 
   return { redirect: { destination: '/dashboard', permanent: false } };
 }

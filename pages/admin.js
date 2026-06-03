@@ -729,10 +729,11 @@ export default function Admin({ profile, isReadOnly }) {
                               body: JSON.stringify({ userId: emp.id, role: newRole }),
                             });
                             loadData();
-                          }} style={{ ...inputStyle, width: 100, fontSize: 11, padding: '3px 6px' }}>
+                          }} style={{ ...inputStyle, width: 110, fontSize: 11, padding: '3px 6px' }}>
                             <option value="employee">Employee</option>
                             <option value="manager">Manager</option>
                             <option value="supervisor">Supervisor</option>
+                            <option value="viewer">Viewer</option>
                           </select>
                         </div>
                       </td>}
@@ -914,9 +915,11 @@ export default function Admin({ profile, isReadOnly }) {
                             const { data: { session: sess } } = await supabase.auth.getSession();
                             await fetch('/api/admin/update-role', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` }, body: JSON.stringify({ userId: emp.id, role: newRole }) });
                             loadData();
-                          }} style={{ ...inputStyle, width: 100, fontSize: 11, padding: '3px 6px' }}>
+                          }} style={{ ...inputStyle, width: 110, fontSize: 11, padding: '3px 6px' }}>
                             <option value="employee">Employee</option>
                             <option value="manager">Manager</option>
+                            <option value="supervisor">Supervisor</option>
+                            <option value="viewer">Viewer</option>
                           </select>
                         </div>
                       </td>
@@ -998,6 +1001,8 @@ export default function Admin({ profile, isReadOnly }) {
                   <select value={newUser.role} onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))} style={inputStyle}>
                     <option value="employee">Employee</option>
                     <option value="manager">Manager</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="viewer">Viewer (Dispatch / Stock)</option>
                   </select>
                 </div>
               </div>

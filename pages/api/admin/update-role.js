@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { userId, role } = req.body;
-  if (!userId || !['employee', 'manager', 'supervisor'].includes(role)) {
+  if (!userId || !['employee', 'manager', 'supervisor', 'viewer'].includes(role)) {
     return res.status(400).json({ error: 'userId and valid role are required.' });
   }
 
