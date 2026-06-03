@@ -1,9 +1,5 @@
 import { useState } from 'react';
 import Head from 'next/head';
-import { useRouter } from 'next/router';
-import { createServerSupabaseClient } from '../lib/supabaseServer';
-import { createAdminClient } from '../lib/supabaseAdmin';
-import { createClient } from '../lib/supabaseClient';
 
 const GREEN = '#005F2C';
 
@@ -24,10 +20,7 @@ function formatValue(v) {
   return `£${Number(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function Lookup({ profile }) {
-  const router = useRouter();
-  const supabase = createClient();
-
+export default function Lookup() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -40,20 +33,10 @@ export default function Lookup({ profile }) {
     setLoading(true);
     setSearched(true);
 
-    const { data } = await supabase
-      .from('listings')
-      .select('*, profiles(full_name, location), batches(difficulty, comments, description)')
-      .ilike('serial_id', `%${q}%`)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    setResults(data || []);
+    const res = await fetch(`/api/lookup-search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    setResults(data.results || []);
     setLoading(false);
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push('/login');
   }
 
   const thStyle = { textAlign: 'left', padding: '8px 12px', fontWeight: 700, fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', background: '#f0f4f0' };
@@ -64,23 +47,12 @@ export default function Lookup({ profile }) {
       <Head><title>GC4C — Serial ID Lookup</title></Head>
       <div style={{ minHeight: '100vh', background: '#f4f6f4' }}>
 
-        {/* Top bar */}
-        <div style={{ background: GREEN, color: '#fff', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '0.05em' }}>GC4C Listings</span>
-            <span style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>
-              {profile.location}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13 }}>
-            <span style={{ opacity: 0.85 }}>{profile.full_name}</span>
-            <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Sign out</button>
-          </div>
+        <div style={{ background: GREEN, color: '#fff', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '0.05em' }}>GC4C — Serial ID Lookup</span>
         </div>
 
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px' }}>
 
-          {/* Search card */}
           <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', padding: '24px', marginBottom: 20 }}>
             <h1 style={{ fontSize: 18, fontWeight: 800, color: '#1a1a1a', margin: '0 0 6px' }}>Serial ID Lookup</h1>
             <p style={{ fontSize: 13, color: '#888', margin: '0 0 20px' }}>Search for any listed club by serial ID. Partial matches supported.</p>
@@ -113,7 +85,6 @@ export default function Lookup({ profile }) {
             </form>
           </div>
 
-          {/* Results */}
           {searched && !loading && (
             <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', padding: '18px 0' }}>
               <div style={{ padding: '0 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -177,19 +148,4 @@ export default function Lookup({ profile }) {
       </div>
     </>
   );
-}
-
-export async function getServerSideProps({ req, res }) {
-  const supabase = createServerSupabaseClient(req, res);
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { redirect: { destination: '/login', permanent: false } };
-
-  const admin = createAdminClient();
-  const { data: profile } = await admin.from('profiles').select('*').eq('id', session.user.id).single();
-
-  if (!profile) return { redirect: { destination: '/login', permanent: false } };
-  if (profile.role === 'manager' || profile.role === 'supervisor') return { redirect: { destination: '/admin', permanent: false } };
-  if (profile.role === 'employee') return { redirect: { destination: '/dashboard', permanent: false } };
-
-  return { props: { profile } };
 }
