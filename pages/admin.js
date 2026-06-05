@@ -310,24 +310,24 @@ export default function Admin({ profile, isReadOnly }) {
 
   // Location summary cards — main locations only (excludes Returns)
   const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'].map(loc => {
-    const todayListings = listings.filter(l => l.date === todayStr && l.profiles?.location === loc);
+    const selectedListings = listings.filter(l => l.date === date && l.profiles?.location === loc);
     const weekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc);
     return {
       loc,
-      todayCount: todayListings.length,
+      todayCount: selectedListings.length,
       weekCount: weekListings.length,
-      todayValue: todayListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+      todayValue: selectedListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
       weekValue: weekListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
     };
   });
 
   // Returns summary (separate)
-  const returnsTodayListings = listings.filter(l => l.date === todayStr && l.profiles?.location === 'Returns');
+  const returnsSelectedListings = listings.filter(l => l.date === date && l.profiles?.location === 'Returns');
   const returnsWeekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === 'Returns');
   const returnsSummary = {
-    todayCount: returnsTodayListings.length,
+    todayCount: returnsSelectedListings.length,
     weekCount: returnsWeekListings.length,
-    todayValue: returnsTodayListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+    todayValue: returnsSelectedListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
     weekValue: returnsWeekListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
   };
 
