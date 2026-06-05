@@ -308,27 +308,25 @@ export default function Admin({ profile, isReadOnly }) {
     return true;
   });
 
-  // Location summary cards — main locations only (excludes Returns)
+  const periodLabel = overviewPeriod === 'day' ? new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : overviewPeriod === 'week' ? 'This Week'
+    : overviewPeriod === 'month' ? 'This Month'
+    : 'Custom';
+
+  // Location summary cards — driven by overviewListings so period + date selector both work
   const locationSummary = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'].map(loc => {
-    const selectedListings = listings.filter(l => l.date === date && l.profiles?.location === loc);
-    const weekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === loc);
+    const periodListings = overviewListings.filter(l => l.profiles?.location === loc);
     return {
       loc,
-      todayCount: selectedListings.length,
-      weekCount: weekListings.length,
-      todayValue: selectedListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
-      weekValue: weekListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+      todayCount: periodListings.length,
+      todayValue: periodListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
     };
   });
 
   // Returns summary (separate)
-  const returnsSelectedListings = listings.filter(l => l.date === date && l.profiles?.location === 'Returns');
-  const returnsWeekListings = listings.filter(l => l.date >= weekStart && l.profiles?.location === 'Returns');
   const returnsSummary = {
-    todayCount: returnsSelectedListings.length,
-    weekCount: returnsWeekListings.length,
-    todayValue: returnsSelectedListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
-    weekValue: returnsWeekListings.reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
+    todayCount: overviewListings.filter(l => l.profiles?.location === 'Returns').length,
+    todayValue: overviewListings.filter(l => l.profiles?.location === 'Returns').reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
   };
 
   function buildEmpStats(emp) {
@@ -423,25 +421,17 @@ export default function Admin({ profile, isReadOnly }) {
 
           {/* Location cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-            {locationSummary.map(({ loc, todayCount, weekCount, todayValue, weekValue }) => (
+            {locationSummary.map(({ loc, todayCount, todayValue }) => (
               <div key={loc} style={{
                 background: '#fff', borderRadius: 10, padding: '14px 16px',
                 boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
                 borderTop: `3px solid ${GREEN}`,
               }}>
                 <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 10 }}>{loc}</div>
-                <div style={{ display: 'flex', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: GREEN, lineHeight: 1 }}>{todayCount}</div>
-                    <div style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>{formatValue(todayValue)}</div>
-                    <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>Today</div>
-                  </div>
-                  <div style={{ width: 1, background: '#eee' }} />
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a', lineHeight: 1 }}>{weekCount}</div>
-                    <div style={{ fontSize: 11, color: '#555', fontWeight: 600 }}>{formatValue(weekValue)}</div>
-                    <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>This Week</div>
-                  </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: GREEN, lineHeight: 1 }}>{todayCount}</div>
+                  <div style={{ fontSize: 11, color: GREEN, fontWeight: 600 }}>{formatValue(todayValue)}</div>
+                  <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>{periodLabel}</div>
                 </div>
               </div>
             ))}
@@ -451,22 +441,12 @@ export default function Admin({ profile, isReadOnly }) {
               borderTop: `3px solid rgba(0,0,0,0.15)`,
             }}>
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>Business Total</div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
-                    {locationSummary.reduce((s, l) => s + l.todayCount, 0) + returnsSummary.todayCount}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.todayValue, 0) + returnsSummary.todayValue)}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>Today</div>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                  {locationSummary.reduce((s, l) => s + l.todayCount, 0) + returnsSummary.todayCount}
                 </div>
-                <div style={{ width: 1, background: 'rgba(255,255,255,0.25)' }} />
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
-                    {locationSummary.reduce((s, l) => s + l.weekCount, 0) + returnsSummary.weekCount}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.weekValue, 0) + returnsSummary.weekValue)}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>This Week</div>
-                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{formatValue(locationSummary.reduce((s, l) => s + l.todayValue, 0) + returnsSummary.todayValue)}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{periodLabel}</div>
               </div>
             </div>
           </div>
@@ -882,8 +862,7 @@ export default function Admin({ profile, isReadOnly }) {
                 <span style={{ fontWeight: 800, fontSize: 14, color: '#e67e22' }}>Returns</span>
                 <span style={{ fontSize: 12, color: '#888' }}>Tracked separately — not included in main totals</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, color: '#666' }}>
-                  <span>Today: <b>{returnsSummary.todayCount}</b></span>
-                  <span>This Week: <b>{returnsSummary.weekCount}</b></span>
+                  <span>{periodLabel}: <b>{returnsSummary.todayCount}</b></span>
                 </div>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
