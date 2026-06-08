@@ -450,6 +450,26 @@ export default function Admin({ profile, isReadOnly }) {
               </div>
             ))}
             <div style={{
+              background: '#fff', borderRadius: 10, padding: '14px 16px',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
+              borderTop: `3px solid #e67e22`,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 10 }}>Returns</div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#e67e22', lineHeight: 1 }}>{returnsSummary.todayCount}</div>
+                  <div style={{ fontSize: 11, color: '#e67e22', fontWeight: 600 }}>{formatValue(returnsSummary.todayValue)}</div>
+                  <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>{periodLabel}</div>
+                </div>
+                <div style={{ width: 1, background: '#eee' }} />
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a', lineHeight: 1 }}>{returnsSummary.weekCount}</div>
+                  <div style={{ fontSize: 11, color: '#555', fontWeight: 600 }}>{formatValue(returnsSummary.weekValue)}</div>
+                  <div style={{ fontSize: 10, color: '#888', marginTop: 1 }}>This Week</div>
+                </div>
+              </div>
+            </div>
+            <div style={{
               background: GREEN, borderRadius: 10, padding: '14px 16px',
               boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
               borderTop: `3px solid rgba(0,0,0,0.15)`,
