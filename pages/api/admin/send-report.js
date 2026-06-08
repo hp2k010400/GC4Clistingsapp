@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 
 const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
 const RECIPIENTS = ['harryp010400@gmail.com'];
@@ -277,18 +278,23 @@ export default async function handler(req, res) {
 
   const subject = `GC4C Daily Report — ${new Date(todayStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · ${todayCount} listings · ${formatValue(todayValue)}`;
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
-    body: JSON.stringify({
-      from: 'GC4C Listings <onboarding@resend.dev>',
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `GC4C Listings <${process.env.GMAIL_USER}>`,
       to: RECIPIENTS,
       subject,
       html,
-    }),
-  });
-
-  const result = await resendRes.json();
-  if (!resendRes.ok) return res.status(500).json({ error: 'Resend failed', detail: result });
-  return res.status(200).json({ success: true, id: result.id });
+    });
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Email failed', detail: err.message });
+  }
 }
