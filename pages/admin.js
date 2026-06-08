@@ -904,7 +904,7 @@ export default function Admin({ profile, isReadOnly }) {
             <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden', marginTop: 16, borderTop: '3px solid #e67e22' }}>
               <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontWeight: 800, fontSize: 14, color: '#e67e22' }}>Returns</span>
-                <span style={{ fontSize: 12, color: '#888' }}>Tracked separately — not included in main totals</span>
+                <span style={{ fontSize: 12, color: '#888' }}>Included in Business Total</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, color: '#666' }}>
                   <span>{periodLabel}: <b>{returnsSummary.todayCount}</b></span>
                 </div>
