@@ -697,8 +697,8 @@ export default function Admin({ profile, isReadOnly }) {
                 <thead>
                   <tr style={{ background: '#f0f4f0' }}>
                     {(isReadOnly
-                      ? ['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value']
-                      : ['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Complete', 'Total Value', 'Checklist', '']
+                      ? ['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Total Value']
+                      : ['Employee', 'Location', 'Listings', 'Easy', 'Medium', 'Hard', 'Total Value', 'Checklist', '']
                     ).map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
@@ -723,9 +723,6 @@ export default function Admin({ profile, isReadOnly }) {
                       <td style={tdStyle}><span style={{ background: '#d4edda', color: '#155724', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20 }}>{batches.easy}</span></td>
                       <td style={tdStyle}><span style={{ background: '#fef3e2', color: '#e67e22', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20 }}>{batches.medium}</span></td>
                       <td style={tdStyle}><span style={{ background: '#fde8e8', color: '#c0392b', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20 }}>{batches.hard}</span></td>
-                      <td style={tdStyle}>
-                        <span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span>
-                      </td>
                       <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(totalValue)}</td>
                       {!isReadOnly && <td style={tdStyle}>
                         <button onClick={() => handleToggleChecklist(emp)} style={{
