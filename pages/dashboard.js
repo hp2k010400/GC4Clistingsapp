@@ -111,6 +111,9 @@ export default function Dashboard({ profile, _debug }) {
   const [empNoteText, setEmpNoteText] = useState('');
   const [empNoteSaving, setEmpNoteSaving] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  const [myNotes, setMyNotes] = useState([]);
+  const [notesStatusFilter, setNotesStatusFilter] = useState('open');
+  const [notesLoading, setNotesLoading] = useState(false);
   const scrollRef = useRef(null);
   const topScrollRef = useRef(null);
   const PAGE_SIZE = 10;
@@ -175,8 +178,22 @@ export default function Dashboard({ profile, _debug }) {
     setHistoryLoading(false);
   }, [profile.id, historyFilter]);
 
+  const loadNotes = useCallback(async () => {
+    setNotesLoading(true);
+    const { data } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('user_id', profile.id)
+      .not('manager_note', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(500000);
+    setMyNotes(data || []);
+    setNotesLoading(false);
+  }, [profile.id]);
+
   useEffect(() => { loadBatches(); loadStats(); }, [loadBatches, loadStats]);
   useEffect(() => { if (view === 'history') loadHistory(); }, [view, loadHistory]);
+  useEffect(() => { if (view === 'notes') loadNotes(); }, [view, loadNotes]);
   useEffect(() => { setHistoryPage(1); }, [historyFilter, historySearch]);
 
   async function handleCreateBatch(e) {
@@ -393,13 +410,18 @@ export default function Dashboard({ profile, _debug }) {
               padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
               background: view === 'history' ? GREEN : '#e8eee8',
               color: view === 'history' ? '#fff' : '#444',
+            }}>My Listings</button>
+            <button onClick={() => setView('notes')} style={{
+              padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+              background: view === 'notes' ? GREEN : '#e8eee8',
+              color: view === 'notes' ? '#fff' : '#444',
               display: 'flex', alignItems: 'center', gap: 7,
             }}>
-              My Listings
+              Notes
               {unresolvedNotesCount > 0 && (
                 <span style={{
-                  background: view === 'history' ? '#fff' : '#e67e22',
-                  color: view === 'history' ? '#e67e22' : '#fff',
+                  background: view === 'notes' ? '#fff' : '#e67e22',
+                  color: view === 'notes' ? '#e67e22' : '#fff',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 800,
                 }}>
                   {unresolvedNotesCount}
@@ -408,8 +430,8 @@ export default function Dashboard({ profile, _debug }) {
             </button>
             <button onClick={() => { setView('batches'); setActiveBatch(null); }} style={{
               padding: '7px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
-              background: view !== 'history' ? GREEN : '#e8eee8',
-              color: view !== 'history' ? '#fff' : '#444',
+              background: view === 'batches' || view === 'batch-detail' ? GREEN : '#e8eee8',
+              color: view === 'batches' || view === 'batch-detail' ? '#fff' : '#444',
             }}>+ Add Listings</button>
           </div>
 
@@ -570,6 +592,84 @@ export default function Dashboard({ profile, _debug }) {
                 )}
               </div>
             </>
+          )}
+
+          {/* ── NOTES ── */}
+          {view === 'notes' && (
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+                {[
+                  { key: 'open', label: 'Open' },
+                  { key: 'resolved', label: 'Resolved' },
+                  { key: 'all', label: 'All' },
+                ].map(f => {
+                  const count = f.key === 'all' ? myNotes.length
+                    : f.key === 'open' ? myNotes.filter(l => !l.note_resolved).length
+                    : myNotes.filter(l => l.note_resolved).length;
+                  return (
+                    <button key={f.key} onClick={() => setNotesStatusFilter(f.key)} style={{
+                      padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+                      background: notesStatusFilter === f.key ? GREEN : '#f0f4f0',
+                      color: notesStatusFilter === f.key ? '#fff' : '#444',
+                    }}>{f.label} ({count})</button>
+                  );
+                })}
+              </div>
+
+              {notesLoading && <p style={{ color: '#999', fontSize: 13 }}>Loading…</p>}
+              {!notesLoading && (() => {
+                const filtered = myNotes.filter(l =>
+                  notesStatusFilter === 'open' ? !l.note_resolved
+                  : notesStatusFilter === 'resolved' ? l.note_resolved
+                  : true
+                );
+                if (filtered.length === 0) return <p style={{ color: '#999', fontSize: 13 }}>No {notesStatusFilter === 'all' ? '' : notesStatusFilter + ' '}notes.</p>;
+                return (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f0f4f0' }}>
+                          <th style={thStyle}>Date</th>
+                          <th style={thStyle}>Serial ID</th>
+                          <th style={thStyle}>Note</th>
+                          <th style={thStyle}>Priority</th>
+                          <th style={thStyle}>Status</th>
+                          <th style={thStyle}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((l, i) => (
+                          <tr key={l.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee', borderLeft: !l.note_resolved ? `3px solid ${l.note_priority ? '#e67e22' : '#ffc107'}` : '3px solid transparent' }}>
+                            <td style={tdStyle}>{new Date(l.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
+                            <td style={{ ...tdStyle, fontWeight: 700 }}>{l.serial_id}</td>
+                            <td style={{ ...tdStyle, maxWidth: 300 }}>{l.manager_note}</td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                              {l.note_priority ? <span style={{ color: '#e67e22', fontWeight: 700, fontSize: 15 }}>⚑</span> : <span style={{ color: '#ccc' }}>—</span>}
+                            </td>
+                            <td style={tdStyle}>
+                              {l.note_resolved
+                                ? <span style={{ background: '#f0f0f0', color: '#888', fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>✓ Resolved</span>
+                                : <span style={{ background: '#fff3cd', color: '#856404', fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>Open</span>}
+                            </td>
+                            <td style={tdStyle}>
+                              {!l.note_resolved && (
+                                <button onClick={async () => {
+                                  await supabase.from('listings').update({ note_resolved: true }).eq('id', l.id);
+                                  loadNotes();
+                                  loadStats();
+                                }} style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  ✓ Mark Done
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
           )}
 
           {/* ── HISTORY ── */}
