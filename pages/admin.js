@@ -351,10 +351,17 @@ export default function Admin({ profile, isReadOnly }) {
   }
 
   // Main employee summary (excludes Returns)
+  const roleOrder = { employee: 0, manager: 1, supervisor: 2 };
   const employeeSummary = employees
     .filter(emp => emp.location !== 'Returns')
     .map(buildEmpStats)
-    .filter(e => location === 'All Locations' || e.emp.location === location);
+    .filter(e => location === 'All Locations' || e.emp.location === location)
+    .sort((a, b) => {
+      const rA = roleOrder[a.emp.role] ?? 3;
+      const rB = roleOrder[b.emp.role] ?? 3;
+      if (rA !== rB) return rA - rB;
+      return a.emp.full_name.localeCompare(b.emp.full_name);
+    });
 
   // Returns employee summary (separate)
   const returnsEmployeeSummary = employees
