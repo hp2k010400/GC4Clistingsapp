@@ -2,7 +2,15 @@ import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
 const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
-const RECIPIENTS = ['harryp010400@gmail.com'];
+const RECIPIENTS = [
+  'Martin.Lord@golfclubs4cash.co.uk',
+  'daniel.thorburn@golfclubs4cash.co.uk',
+  'john.mantle@golfclubs4cash.co.uk',
+  'michael.knowles@golfclubs4cash.co.uk',
+  'murray.winton@golfclubs4cash.co.uk',
+  'martin.lambert@golfclubs4cash.co.uk',
+  'elliot.fleming@golfclubs4cash.co.uk',
+];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
@@ -48,12 +56,18 @@ export default async function handler(req, res) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'Unauthorised.' });
-  const { data: { user } } = await admin.auth.getUser(token);
-  if (!user) return res.status(401).json({ error: 'Unauthorised.' });
-  const { data: callerProfile } = await admin.from('profiles').select('role').eq('id', user.id).single();
-  if (callerProfile?.role !== 'manager') return res.status(403).json({ error: 'Forbidden.' });
+  // Allow scheduled function to call with secret key
+  const reportSecret = req.headers['x-report-secret'];
+  if (reportSecret && reportSecret === process.env.REPORT_SECRET) {
+    // authorised via secret — skip user auth
+  } else {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: 'Unauthorised.' });
+    const { data: { user } } = await admin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorised.' });
+    const { data: callerProfile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+    if (callerProfile?.role !== 'manager') return res.status(403).json({ error: 'Forbidden.' });
+  }
 
   const todayStr     = today();
   const yesterdayStr = daysAgo(1);

@@ -6,4 +6,4 @@
   package = "@netlify/plugin-nextjs"
 
 [functions."daily-report"]
-  schedule = "0 17 * * 1-5"
+  schedule = "0 15 * * 1-5"
