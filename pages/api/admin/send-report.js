@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 
 const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
 const RECIPIENTS = [
+  'harryp010400@gmail.com',
   'Martin.Lord@golfclubs4cash.co.uk',
   'daniel.thorburn@golfclubs4cash.co.uk',
   'john.mantle@golfclubs4cash.co.uk',
