@@ -70,9 +70,10 @@ export default async function handler(req, res) {
     if (callerProfile?.role !== 'manager') return res.status(403).json({ error: 'Forbidden.' });
   }
 
-  const todayStr     = today();
-  const yesterdayStr = daysAgo(1);
-  const lastWeekStr  = daysAgo(7);
+  // Report covers yesterday (previous full day)
+  const todayStr     = daysAgo(1);
+  const yesterdayStr = daysAgo(2);
+  const lastWeekStr  = daysAgo(8);
   const weekStart    = getWeekStart();
   const lastWeekDay  = new Date(lastWeekStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' });
 
