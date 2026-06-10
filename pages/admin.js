@@ -777,7 +777,6 @@ export default function Admin({ profile, isReadOnly }) {
                       <td style={{ ...tdStyle, color: '#155724' }}>{employeeSummary.reduce((s, e) => s + e.batches.easy, 0)}</td>
                       <td style={{ ...tdStyle, color: '#e67e22' }}>{employeeSummary.reduce((s, e) => s + e.batches.medium, 0)}</td>
                       <td style={{ ...tdStyle, color: '#c0392b' }}>{employeeSummary.reduce((s, e) => s + e.batches.hard, 0)}</td>
-                      <td style={{ ...tdStyle, color: '#28a745' }}>{employeeSummary.reduce((s, e) => s + e.complete, 0)}</td>
                       <td style={{ ...tdStyle, fontWeight: 700, color: GREEN }}>{formatValue(employeeSummary.reduce((s, e) => s + e.totalValue, 0))}</td>
                       <td style={tdStyle}></td>
                       <td style={tdStyle}></td>

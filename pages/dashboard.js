@@ -114,6 +114,9 @@ export default function Dashboard({ profile, _debug }) {
   const [myNotes, setMyNotes] = useState([]);
   const [notesStatusFilter, setNotesStatusFilter] = useState('open');
   const [notesLoading, setNotesLoading] = useState(false);
+  const [editBatchTarget, setEditBatchTarget] = useState(null);
+  const [editBatchForm, setEditBatchForm] = useState({});
+  const [editBatchSaving, setEditBatchSaving] = useState(false);
   const scrollRef = useRef(null);
   const topScrollRef = useRef(null);
   const PAGE_SIZE = 10;
@@ -302,6 +305,20 @@ export default function Dashboard({ profile, _debug }) {
     loadBatches();
   }
 
+  async function handleSaveBatchEdit(e) {
+    e.preventDefault();
+    setEditBatchSaving(true);
+    await supabase.from('batches').update({
+      difficulty: editBatchForm.difficulty,
+      comments: editBatchForm.comments.trim() || null,
+      description: editBatchForm.description.trim() || null,
+      date: editBatchForm.date,
+    }).eq('id', editBatchTarget.id);
+    setEditBatchSaving(false);
+    setEditBatchTarget(null);
+    loadBatches();
+  }
+
   async function handleChangePassword(e) {
     e.preventDefault();
     setPwError('');
@@ -467,6 +484,7 @@ export default function Dashboard({ profile, _debug }) {
                         <span style={{ fontSize: 12, color: '#bbb' }}>{formatTime(batch.created_at)}</span>
                         <span style={{ fontSize: 12, color: GREEN, fontWeight: 700 }}>Open →</span>
                       </button>
+                      <button onClick={() => { setEditBatchTarget(batch); setEditBatchForm({ difficulty: batch.difficulty, comments: batch.comments || '', description: batch.description || '', date: batch.date }); }} style={{ background: 'none', border: '1px solid #c5d3f5', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', color: '#1a56db', fontSize: 12, fontWeight: 600 }}>Edit</button>
                       <button onClick={() => handleDeleteBatch(batch.id)} style={{ background: 'none', border: '1px solid #e8c0c0', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', color: '#c0392b', fontSize: 13, whiteSpace: 'nowrap' }}>✕</button>
                     </div>
                   ))}
@@ -793,6 +811,41 @@ export default function Dashboard({ profile, _debug }) {
 
         </div>
       </div>
+
+      {/* Edit batch modal */}
+      {editBatchTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={e => e.target === e.currentTarget && setEditBatchTarget(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '28px', width: '100%', maxWidth: 440, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Edit Batch</h2>
+            <form onSubmit={handleSaveBatchEdit}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Difficulty *</label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  {DIFFICULTY.map(d => (
+                    <button key={d.key} type="button" onClick={() => setEditBatchForm(f => ({ ...f, difficulty: d.key }))} style={{ flex: 1, padding: '10px 0', borderRadius: 7, cursor: 'pointer', fontWeight: 700, fontSize: 13, border: `2px solid ${editBatchForm.difficulty === d.key ? d.color : '#e0e0e0'}`, background: editBatchForm.difficulty === d.key ? d.bg : '#fff', color: editBatchForm.difficulty === d.key ? d.color : '#888' }}>{d.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Date</label>
+                <input type="date" value={editBatchForm.date} onChange={e => setEditBatchForm(f => ({ ...f, date: e.target.value }))} style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Batch Reference</label>
+                <input type="text" value={editBatchForm.comments} onChange={e => setEditBatchForm(f => ({ ...f, comments: e.target.value }))} style={inputStyle} placeholder="e.g. 28/05 Batch 1 M2" />
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Description</label>
+                <input type="text" value={editBatchForm.description} onChange={e => setEditBatchForm(f => ({ ...f, description: e.target.value }))} style={inputStyle} placeholder="e.g. Taylormade Woods" />
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setEditBatchTarget(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={editBatchSaving} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: editBatchSaving ? '#aaa' : GREEN, color: '#fff', cursor: editBatchSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>{editBatchSaving ? 'Saving…' : 'Save Changes'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* New batch modal */}
       {showBatchForm && (
