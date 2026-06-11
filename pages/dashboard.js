@@ -92,6 +92,8 @@ export default function Dashboard({ profile, _debug }) {
 
   const [statsToday, setStatsToday] = useState(0);
   const [statsWeek, setStatsWeek] = useState(0);
+  const [statsTodayValue, setStatsTodayValue] = useState(0);
+  const [statsWeekValue, setStatsWeekValue] = useState(0);
 
   const [historyListings, setHistoryListings] = useState([]);
   const [historyFilter, setHistoryFilter] = useState('day');
@@ -126,14 +128,18 @@ export default function Dashboard({ profile, _debug }) {
     const day = d.getDay();
     d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
     const weekStart = d.toISOString().slice(0, 10);
-    const [{ count: tc }, { count: wc }, { count: nc }] = await Promise.all([
+    const [{ count: tc }, { count: wc }, { count: nc }, { data: todayData }, { data: weekData }] = await Promise.all([
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).eq('date', today()),
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).gte('date', weekStart),
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('user_id', profile.id).not('manager_note', 'is', null).eq('note_resolved', false),
+      supabase.from('listings').select('listing_value').eq('user_id', profile.id).eq('date', today()),
+      supabase.from('listings').select('listing_value').eq('user_id', profile.id).gte('date', weekStart),
     ]);
     setStatsToday(tc || 0);
     setStatsWeek(wc || 0);
     setUnresolvedNotesCount(nc || 0);
+    setStatsTodayValue((todayData || []).reduce((s, l) => s + (Number(l.listing_value) || 0), 0));
+    setStatsWeekValue((weekData || []).reduce((s, l) => s + (Number(l.listing_value) || 0), 0));
   }, [profile.id]);
 
   const loadBatches = useCallback(async () => {
@@ -413,11 +419,13 @@ export default function Dashboard({ profile, _debug }) {
               <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Today</div>
               <div style={{ fontSize: 30, fontWeight: 900, color: GREEN, lineHeight: 1 }}>{statsToday}</div>
               <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>listings</div>
+              {statsTodayValue > 0 && <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, marginTop: 6 }}>£{statsTodayValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>}
             </div>
             <div style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', borderTop: '3px solid #bbb' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>This Week</div>
               <div style={{ fontSize: 30, fontWeight: 900, color: '#1a1a1a', lineHeight: 1 }}>{statsWeek}</div>
               <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>listings</div>
+              {statsWeekValue > 0 && <div style={{ fontSize: 13, fontWeight: 700, color: '#555', marginTop: 6 }}>£{statsWeekValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>}
             </div>
           </div>
 
