@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     loc,
     count: todayMain.filter(l => l.profiles?.location === loc).length,
     value: todayMain.filter(l => l.profiles?.location === loc).reduce((s, l) => s + (Number(l.listing_value) || 0), 0),
-  }));
+  })).sort((a, b) => b.count - a.count);
 
   const listerMap = {};
   todayMain.forEach(l => {
@@ -265,17 +265,19 @@ export default async function handler(req, res) {
             <td align="right" style="padding:8px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666">Share</td>
             <td style="padding:8px 24px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666" width="120"></td>
           </tr>
-          ${typeRows.map((t, i) => `
+          ${typeRows.map((t, i) => {
+            const barPct = typeRows[0].count > 0 ? Math.round(t.count / typeRows[0].count * 100) : 0;
+            return `
           <tr style="${i % 2 === 0 ? ROW_EVEN : ROW_ODD}">
             <td style="padding:10px 24px;font-size:13px;font-weight:600;color:#222;border-bottom:1px solid #f0f0f0">${t.type}</td>
             <td align="right" style="padding:10px 16px;font-size:13px;color:#333;border-bottom:1px solid #f0f0f0">${t.count}</td>
             <td align="right" style="padding:10px 16px;font-size:13px;font-weight:700;color:#005F2C;border-bottom:1px solid #f0f0f0">${t.pct}%</td>
             <td style="padding:10px 24px;border-bottom:1px solid #f0f0f0">
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#e8e8e8;border-radius:4px;height:8px">
-                <tr><td width="${t.pct}%" style="background:#005F2C;border-radius:4px;height:8px;font-size:0">&nbsp;</td><td></td></tr>
+                <tr><td width="${barPct}%" style="background:#005F2C;border-radius:4px;height:8px;font-size:0">&nbsp;</td><td></td></tr>
               </table>
             </td>
-          </tr>`).join('')}
+          </tr>`;}).join('')}
         </table>
         <div style="height:8px"></div>
       </td></tr>
