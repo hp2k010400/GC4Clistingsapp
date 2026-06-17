@@ -122,27 +122,14 @@ export default function Admin({ profile, isReadOnly }) {
     if (listingsPeriod === 'all') {
       fromDate = null;
     }
-    let q = supabase
-      .from('listings')
-      .select('*, profiles(full_name, location), batches(difficulty, comments, description, photo_urls)')
-      .order('created_at', { ascending: false })
-      .limit(500000);
-    if (fromDate) q = q.gte('date', fromDate);
 
-    const [{ data: allListings }, { data: allEmployees }, { data: allNotes }] = await Promise.all([
-      q,
-      supabase.from('profiles').select('*').order('full_name'),
-      supabase.from('listings')
-        .select('*, profiles(full_name, location)')
-        .not('manager_note', 'is', null)
-        .order('note_priority', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(10000),
-    ]);
+    const url = fromDate ? `/api/admin/data?fromDate=${fromDate}` : '/api/admin/data';
+    const result = await fetch(url);
+    const json = await result.json();
 
-    setListings(allListings || []);
-    setEmployees(allEmployees || []);
-    setNotes(allNotes || []);
+    setListings(json.listings || []);
+    setEmployees(json.employees || []);
+    setNotes(json.notes || []);
     setLoading(false);
   }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo, date]);
 
