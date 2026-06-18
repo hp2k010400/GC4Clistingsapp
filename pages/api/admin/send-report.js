@@ -14,6 +14,9 @@ const RECIPIENTS = [
   'David.coles@golfclubs4cash.co.uk',
   'Mike.Currie@golfclubs4cash.co.uk',
   'Connor.Wright@golfclubs4cash.co.uk',
+  'Lennon.McMillan@golfclubs4cash.co.uk',
+  'Oscar.Doran@golfclubs4cash.co.uk',
+  'Morgan.Jones@golfclubs4cash.co.uk',
 ];
 
 function today() { return new Date().toISOString().slice(0, 10); }
