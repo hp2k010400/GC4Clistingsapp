@@ -127,6 +127,7 @@ export default async function handler(req, res) {
     listerMap[name].value += Number(l.listing_value) || 0;
   });
   const topListers = Object.values(listerMap).sort((a, b) => b.value - a.value).slice(0, 3);
+  const topListersByCount = Object.values(listerMap).sort((a, b) => b.count - a.count).slice(0, 3);
 
   const typeMap = {};
   todayMain.filter(l => l.product_type).forEach(l => {
@@ -251,6 +252,34 @@ export default async function handler(req, res) {
             <td style="padding:10px 8px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0">${l.loc}</td>
             <td align="right" style="padding:10px 8px;font-size:13px;color:#333;border-bottom:1px solid #f0f0f0">${l.count}</td>
             <td align="right" style="padding:10px 24px;font-size:13px;font-weight:700;color:#005F2C;border-bottom:1px solid #f0f0f0">${formatValue(l.value)}</td>
+          </tr>`).join('')}
+        </table>
+        <div style="height:8px"></div>
+      </td></tr>
+    </table>` : ''}
+
+    ${topListersByCount.length > 0 ? `
+    <!-- TOP 3 BY COUNT -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;margin-bottom:16px;border-radius:8px">
+      <tr><td style="padding:18px 24px 0">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#888;margin-bottom:12px">Top 3 Listers Today &mdash; by Listings</div>
+      </td></tr>
+      <tr><td>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr style="background:#f0f4f0">
+            <td style="padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666" width="36"></td>
+            <td style="padding:8px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666">Name</td>
+            <td style="padding:8px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666">Location</td>
+            <td align="right" style="padding:8px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666">Listings</td>
+            <td align="right" style="padding:8px 24px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666">Value</td>
+          </tr>
+          ${topListersByCount.map((l, i) => `
+          <tr style="${i === 0 ? 'background:#f0f7f0' : i % 2 === 0 ? ROW_EVEN : ROW_ODD}">
+            <td style="padding:10px 12px;font-size:18px;border-bottom:1px solid #f0f0f0">${MEDAL[i]}</td>
+            <td style="padding:10px 8px;font-size:13px;font-weight:700;color:#222;border-bottom:1px solid #f0f0f0">${l.name}</td>
+            <td style="padding:10px 8px;font-size:13px;color:#666;border-bottom:1px solid #f0f0f0">${l.loc}</td>
+            <td align="right" style="padding:10px 8px;font-size:13px;font-weight:700;color:#005F2C;border-bottom:1px solid #f0f0f0">${l.count}</td>
+            <td align="right" style="padding:10px 24px;font-size:13px;color:#333;border-bottom:1px solid #f0f0f0">${formatValue(l.value)}</td>
           </tr>`).join('')}
         </table>
         <div style="height:8px"></div>
