@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
-const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton'];
+const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'];
 const RECIPIENTS = [
   'harryp010400@gmail.com',
   'Martin.Lord@golfclubs4cash.co.uk',
@@ -102,10 +102,8 @@ export default async function handler(req, res) {
 
   if (dbError) return res.status(500).json({ error: 'DB error', detail: dbError.message });
 
-  const isReturn = l => l.profiles?.location === 'Returns';
-
-  const thisWeek = listings.filter(l => thisWeekDates.includes(l.date) && !isReturn(l));
-  const prevWeek = listings.filter(l => prevWeekDates.includes(l.date) && !isReturn(l));
+  const thisWeek = listings.filter(l => thisWeekDates.includes(l.date));
+  const prevWeek = listings.filter(l => prevWeekDates.includes(l.date));
 
   const thisTotal = sumListings(thisWeek);
   const prevTotal = sumListings(prevWeek);
