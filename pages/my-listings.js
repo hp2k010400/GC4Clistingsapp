@@ -426,7 +426,7 @@ export default function MyListings({ profile, _debug }) {
               <textarea
                 value={newTimeAwayComment}
                 onChange={e => setNewTimeAwayComment(e.target.value)}
-                placeholder="e.g. Away from desk 10:15–10:45 — stock count"
+                placeholder="e.g. Away from desk 10:15–10:45"
                 rows={2}
                 style={{ flex: 1, padding: '8px 10px', borderRadius: 7, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
               />
