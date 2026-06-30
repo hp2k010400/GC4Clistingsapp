@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
 const LOCATIONS = ['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'];
+const CHECKLIST = ['metafields', 'title', 'price', 'photographs', 'specifications', 'serial_id_checked', 'condition'];
 const RECIPIENTS = [
   'harryp010400@gmail.com',
   'Martin.Lord@golfclubs4cash.co.uk',
@@ -95,15 +96,20 @@ export default async function handler(req, res) {
 
   const { data: listings, error: dbError } = await admin
     .from('listings')
-    .select('date, user_id, listing_value, product_type, profiles(full_name, location)')
+    .select(`date, user_id, listing_value, product_type, profiles(full_name, location), ${CHECKLIST.join(', ')}`)
     .gte('date', prevStart)
     .lte('date', weekEnd)
     .limit(500000);
 
   if (dbError) return res.status(500).json({ error: 'DB error', detail: dbError.message });
 
-  const thisWeek = listings.filter(l => thisWeekDates.includes(l.date));
-  const prevWeek = listings.filter(l => prevWeekDates.includes(l.date));
+  // Returns only count once fully checked off (matches admin's "Complete" column, not "Processed")
+  const isReturn = l => l.profiles?.location === 'Returns';
+  const isComplete = l => CHECKLIST.every(c => l[c]);
+  const countable = l => !isReturn(l) || isComplete(l);
+
+  const thisWeek = listings.filter(l => thisWeekDates.includes(l.date) && countable(l));
+  const prevWeek = listings.filter(l => prevWeekDates.includes(l.date) && countable(l));
 
   const thisTotal = sumListings(thisWeek);
   const prevTotal = sumListings(prevWeek);
