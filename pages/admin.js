@@ -902,18 +902,17 @@ export default function Admin({ profile, isReadOnly }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#fef3e2' }}>
-                    {['Employee', 'Location', 'Processed', 'Complete', 'Checklist', ''].map(h => (
+                    {['Employee', 'Location', 'Processed', 'Checklist', ''].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {returnsEmployeeSummary.map(({ emp, count, complete }, i) => (
+                  {returnsEmployeeSummary.map(({ emp, count }, i) => (
                     <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{emp.full_name}</td>
                       <td style={tdStyle}>{emp.location}</td>
                       <td style={{ ...tdStyle, fontWeight: 700 }}><span style={{ color: '#e67e22' }}>{count}</span></td>
-                      <td style={tdStyle}><span style={{ color: '#28a745', fontWeight: 600 }}>{complete}</span></td>
                       <td style={tdStyle}>
                         <button onClick={() => handleToggleChecklist(emp)} style={{ background: emp.mandatory_checklist ? '#d4edda' : '#f0f0f0', border: `1px solid ${emp.mandatory_checklist ? '#c3e6cb' : '#ddd'}`, borderRadius: 5, padding: '3px 10px', fontSize: 11, cursor: 'pointer', color: emp.mandatory_checklist ? '#155724' : '#888', fontWeight: 700 }}>
                           {emp.mandatory_checklist ? 'Required' : 'Optional'}
