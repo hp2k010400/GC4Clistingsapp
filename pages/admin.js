@@ -96,6 +96,7 @@ export default function Admin({ profile, isReadOnly }) {
   const [notesEmployee, setNotesEmployee] = useState('');
   const [notesSearch, setNotesSearch] = useState('');
   const [notes, setNotes] = useState([]);
+  const [timeAwayNotes, setTimeAwayNotes] = useState([]);
   const [empDetail, setEmpDetail] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -130,6 +131,7 @@ export default function Admin({ profile, isReadOnly }) {
     setListings(json.listings || []);
     setEmployees(json.employees || []);
     setNotes(json.notes || []);
+    setTimeAwayNotes(json.timeAwayNotes || []);
     setLoading(false);
   }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo, date]);
 
@@ -500,6 +502,7 @@ export default function Admin({ profile, isReadOnly }) {
                 { key: 'overview', label: 'Employee Overview' },
                 { key: 'listings', label: 'All Listings' },
                 { key: 'notes', label: `Notes${notes.filter(n => !n.note_resolved).length > 0 ? ` (${notes.filter(n => !n.note_resolved).length})` : ''}` },
+                { key: 'timeaway', label: 'Time Away' },
               ].map(({ key, label }) => (
                 <button key={key} onClick={() => setActiveTab(key)} style={{
                   padding: '6px 14px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer',
@@ -673,6 +676,39 @@ export default function Admin({ profile, isReadOnly }) {
                             </button>
                           </div>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          ) : activeTab === 'timeaway' ? (
+
+            /* Time Away tab */
+            <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', fontSize: 13, color: '#888' }}>
+                {timeAwayNotes.length} comment{timeAwayNotes.length !== 1 ? 's' : ''}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f0f4f0' }}>
+                      {['Date', 'Time', 'Employee', 'Location', 'Comment'].map(h => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timeAwayNotes.length === 0 ? (
+                      <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#999' }}>No comments logged.</td></tr>
+                    ) : timeAwayNotes.map((n, i) => (
+                      <tr key={n.id} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #eee' }}>
+                        <td style={tdStyle}>{n.date}</td>
+                        <td style={tdStyle}>{new Date(n.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700 }}>{n.profiles?.full_name}</td>
+                        <td style={tdStyle}>{n.profiles?.location}</td>
+                        <td style={{ ...tdStyle, color: '#333' }}>{n.comment}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -107,6 +107,28 @@ alter table public.listings
   add column if not exists serial_id_checked boolean not null default false;
 
 -- ============================================================
+-- Time away notes (employee log of unexplained time away from listing)
+-- ============================================================
+
+create table public.time_away_notes (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  date       date not null default current_date,
+  comment    text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.time_away_notes enable row level security;
+
+create policy "Employee time away notes"
+  on public.time_away_notes for all
+  using (auth.uid() = user_id or public.is_manager())
+  with check (auth.uid() = user_id);
+
+grant all on public.time_away_notes to anon, authenticated, service_role;
+create index on public.time_away_notes (user_id, date);
+
+-- ============================================================
 -- Your first manager account
 -- ============================================================
 -- After creating your own Supabase Auth user (via the Auth tab),

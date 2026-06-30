@@ -116,6 +116,9 @@ export default function MyListings({ profile, _debug }) {
   const [editBatchTarget, setEditBatchTarget] = useState(null);
   const [editBatchForm, setEditBatchForm] = useState({});
   const [editBatchSaving, setEditBatchSaving] = useState(false);
+  const [timeAwayNotes, setTimeAwayNotes] = useState([]);
+  const [newTimeAwayComment, setNewTimeAwayComment] = useState('');
+  const [timeAwaySaving, setTimeAwaySaving] = useState(false);
   const scrollRef = useRef(null);
   const topScrollRef = useRef(null);
   const PAGE_SIZE = 10;
@@ -138,6 +141,30 @@ export default function MyListings({ profile, _debug }) {
     setStatsTodayValue((todayData || []).reduce((s, l) => s + (Number(l.listing_value) || 0), 0));
     setStatsWeekValue((weekData || []).reduce((s, l) => s + (Number(l.listing_value) || 0), 0));
   }, [profile.id]);
+
+  const loadTimeAwayNotes = useCallback(async () => {
+    const { data } = await supabase
+      .from('time_away_notes')
+      .select('*')
+      .eq('user_id', profile.id)
+      .eq('date', today())
+      .order('created_at', { ascending: false });
+    setTimeAwayNotes(data || []);
+  }, [profile.id]);
+
+  async function handleAddTimeAwayComment(e) {
+    e.preventDefault();
+    if (!newTimeAwayComment.trim()) return;
+    setTimeAwaySaving(true);
+    await supabase.from('time_away_notes').insert({
+      user_id: profile.id,
+      date: today(),
+      comment: newTimeAwayComment.trim(),
+    });
+    setNewTimeAwayComment('');
+    setTimeAwaySaving(false);
+    loadTimeAwayNotes();
+  }
 
   const loadBatches = useCallback(async () => {
     const { data } = await supabase
@@ -187,7 +214,7 @@ export default function MyListings({ profile, _debug }) {
     setNotesLoading(false);
   }, [profile.id]);
 
-  useEffect(() => { loadBatches(); loadStats(); }, [loadBatches, loadStats]);
+  useEffect(() => { loadBatches(); loadStats(); loadTimeAwayNotes(); }, [loadBatches, loadStats, loadTimeAwayNotes]);
   useEffect(() => { if (view === 'history') loadHistory(); }, [view, loadHistory]);
   useEffect(() => { if (view === 'notes') loadNotes(); }, [view, loadNotes]);
   useEffect(() => { setHistoryPage(1); }, [historyFilter, historySearch]);
@@ -390,6 +417,37 @@ export default function MyListings({ profile, _debug }) {
               <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>listings</div>
               {statsWeekValue > 0 && <div style={{ fontSize: 13, fontWeight: 700, color: '#555', marginTop: 6 }}>£{statsWeekValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>}
             </div>
+          </div>
+
+          {/* Additional comment / time away log */}
+          <div style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Additional Comment</div>
+            <form onSubmit={handleAddTimeAwayComment} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <textarea
+                value={newTimeAwayComment}
+                onChange={e => setNewTimeAwayComment(e.target.value)}
+                placeholder="e.g. Away from desk 10:15–10:45 — stock count"
+                rows={2}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 7, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+              />
+              <button type="submit" disabled={timeAwaySaving || !newTimeAwayComment.trim()} style={{
+                background: GREEN, color: '#fff', border: 'none', borderRadius: 7, padding: '10px 16px',
+                fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+                opacity: timeAwaySaving || !newTimeAwayComment.trim() ? 0.6 : 1,
+              }}>
+                {timeAwaySaving ? 'Saving…' : 'Add'}
+              </button>
+            </form>
+            {timeAwayNotes.length > 0 && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {timeAwayNotes.map(n => (
+                  <div key={n.id} style={{ fontSize: 12, color: '#555', display: 'flex', gap: 8 }}>
+                    <span style={{ color: '#999', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatTime(n.created_at)}</span>
+                    <span>{n.comment}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>

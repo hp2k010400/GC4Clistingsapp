@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     .limit(500000);
   if (fromDate) q = q.gte('date', fromDate);
 
-  const [{ data: allListings }, { data: allEmployees }, { data: allNotes }] = await Promise.all([
+  const [{ data: allListings }, { data: allEmployees }, { data: allNotes }, { data: allTimeAwayNotes }] = await Promise.all([
     q,
     admin.from('profiles').select('*').order('full_name'),
     admin.from('listings')
@@ -32,11 +32,16 @@ export default async function handler(req, res) {
       .order('note_priority', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(10000),
+    admin.from('time_away_notes')
+      .select('*, profiles(full_name, location)')
+      .order('created_at', { ascending: false })
+      .limit(10000),
   ]);
 
   return res.status(200).json({
     listings: allListings || [],
     employees: allEmployees || [],
     notes: allNotes || [],
+    timeAwayNotes: allTimeAwayNotes || [],
   });
 }
