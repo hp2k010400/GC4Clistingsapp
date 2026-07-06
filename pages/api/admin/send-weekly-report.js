@@ -9,7 +9,7 @@ const RECIPIENTS = [
   'daniel.thorburn@golfclubs4cash.co.uk',
 ];
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // Returns YYYY-MM-DD for a date offset by n days from today
 function daysAgo(n) {
@@ -81,6 +81,7 @@ export default async function handler(req, res) {
     daysAgo(5), // Wed
     daysAgo(4), // Thu
     daysAgo(3), // Fri
+    daysAgo(2), // Sat
   ];
   const prevWeekDates = [
     daysAgo(14),
@@ -88,10 +89,11 @@ export default async function handler(req, res) {
     daysAgo(12),
     daysAgo(11),
     daysAgo(10),
+    daysAgo(9),
   ];
 
   const weekStart = thisWeekDates[0];
-  const weekEnd   = thisWeekDates[4];
+  const weekEnd   = thisWeekDates[5];
   const prevStart = prevWeekDates[0];
 
   const { data: listings, error: dbError } = await admin
@@ -114,8 +116,8 @@ export default async function handler(req, res) {
   const thisTotal = sumListings(thisWeek);
   const prevTotal = sumListings(prevWeek);
 
-  const avgDayCount = thisTotal.count > 0 ? (thisTotal.count / 5).toFixed(1) : 0;
-  const avgDayValue = thisTotal.value > 0 ? thisTotal.value / 5 : 0;
+  const avgDayCount = thisTotal.count > 0 ? (thisTotal.count / 6).toFixed(1) : 0;
+  const avgDayValue = thisTotal.value > 0 ? thisTotal.value / 6 : 0;
 
   // Per-day breakdown
   const dayRows = thisWeekDates.map((date, i) => {
