@@ -98,20 +98,15 @@ export default async function handler(req, res) {
 
   const { data: listings, error: dbError } = await admin
     .from('listings')
-    .select(`date, user_id, listing_value, product_type, profiles(full_name, location), ${CHECKLIST.join(', ')}`)
+    .select('date, user_id, listing_value, product_type, profiles(full_name, location)')
     .gte('date', prevStart)
     .lte('date', weekEnd)
     .limit(500000);
 
   if (dbError) return res.status(500).json({ error: 'DB error', detail: dbError.message });
 
-  // Returns only count once fully checked off (matches admin's "Complete" column, not "Processed")
-  const isReturn = l => l.profiles?.location === 'Returns';
-  const isComplete = l => CHECKLIST.every(c => l[c]);
-  const countable = l => !isReturn(l) || isComplete(l);
-
-  const thisWeek = listings.filter(l => thisWeekDates.includes(l.date) && countable(l));
-  const prevWeek = listings.filter(l => prevWeekDates.includes(l.date) && countable(l));
+  const thisWeek = listings.filter(l => thisWeekDates.includes(l.date));
+  const prevWeek = listings.filter(l => prevWeekDates.includes(l.date));
 
   const thisTotal = sumListings(thisWeek);
   const prevTotal = sumListings(prevWeek);
