@@ -98,6 +98,10 @@ export default function Admin({ profile, isReadOnly }) {
   const [notes, setNotes] = useState([]);
   const [timeAwayNotes, setTimeAwayNotes] = useState([]);
   const [showFormerStaff, setShowFormerStaff] = useState(false);
+  const [editEmp, setEditEmp] = useState(null);
+  const [editEmpForm, setEditEmpForm] = useState({});
+  const [editEmpSaving, setEditEmpSaving] = useState(false);
+  const [editEmpError, setEditEmpError] = useState('');
   const [empDetail, setEmpDetail] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -137,6 +141,23 @@ export default function Admin({ profile, isReadOnly }) {
   }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo, date]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function handleSaveEditEmp(e) {
+    e.preventDefault();
+    setEditEmpError('');
+    setEditEmpSaving(true);
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin/update-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` },
+      body: JSON.stringify({ userId: editEmp.id, ...editEmpForm }),
+    });
+    const data = await res.json();
+    setEditEmpSaving(false);
+    if (!res.ok) { setEditEmpError(data.error || 'Failed to update.'); return; }
+    setEditEmp(null);
+    loadData();
+  }
 
   async function handleToggleActive(emp, active) {
     if (!active && !confirm(`Deactivate ${emp.full_name}? They will be hidden from lists but all their data is kept.`)) return;
@@ -780,6 +801,10 @@ export default function Admin({ profile, isReadOnly }) {
                       </td>}
                       {!isReadOnly && <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => { setEditEmp(emp); setEditEmpForm({ full_name: emp.full_name, email: emp.email || '', location: emp.location }); setEditEmpError(''); }} style={{
+                            background: 'none', border: '1px solid #c5d3f5', borderRadius: 5,
+                            padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#1a56db', whiteSpace: 'nowrap',
+                          }}>Edit</button>
                           <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{
                             background: 'none', border: '1px solid #ddd', borderRadius: 5,
                             padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666', whiteSpace: 'nowrap',
@@ -1014,6 +1039,7 @@ export default function Admin({ profile, isReadOnly }) {
                       </td>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => { setEditEmp(emp); setEditEmpForm({ full_name: emp.full_name, email: emp.email || '', location: emp.location }); setEditEmpError(''); }} style={{ background: 'none', border: '1px solid #c5d3f5', borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#1a56db' }}>Edit</button>
                           <button onClick={() => { setResetTarget(emp); setResetPassword(''); setResetError(''); }} style={{ background: 'none', border: '1px solid #ddd', borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#666' }}>Reset pwd</button>
                           <select value={emp.role} onChange={async e => {
                             const newRole = e.target.value;
@@ -1213,6 +1239,43 @@ export default function Admin({ profile, isReadOnly }) {
                   background: resetSaving ? '#aaa' : GREEN, color: '#fff',
                   cursor: resetSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
                 }}>{resetSaving ? 'Saving…' : 'Reset Password'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit employee modal */}
+      {editEmp && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => e.target === e.currentTarget && setEditEmp(null)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '28px 28px', width: '100%', maxWidth: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Edit Employee</h2>
+            <form onSubmit={handleSaveEditEmp}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Full Name</label>
+                <input type="text" required value={editEmpForm.full_name || ''}
+                  onChange={e => setEditEmpForm(f => ({ ...f, full_name: e.target.value }))}
+                  style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Email</label>
+                <input type="email" required value={editEmpForm.email || ''}
+                  onChange={e => setEditEmpForm(f => ({ ...f, email: e.target.value }))}
+                  style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={labelStyle}>Location</label>
+                <select value={editEmpForm.location || ''} onChange={e => setEditEmpForm(f => ({ ...f, location: e.target.value }))} style={inputStyle}>
+                  {['Edinburgh', 'Warrington', 'Milton Keynes', 'Southampton', 'Returns'].map(l => <option key={l}>{l}</option>)}
+                </select>
+              </div>
+              {editEmpError && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{editEmpError}</p>}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setEditEmp(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cancel</button>
+                <button type="submit" disabled={editEmpSaving} style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: editEmpSaving ? '#aaa' : GREEN, color: '#fff', cursor: editEmpSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
+                  {editEmpSaving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
