@@ -97,6 +97,7 @@ export default function Admin({ profile, isReadOnly }) {
   const [notesSearch, setNotesSearch] = useState('');
   const [notes, setNotes] = useState([]);
   const [timeAwayNotes, setTimeAwayNotes] = useState([]);
+  const [showFormerStaff, setShowFormerStaff] = useState(false);
   const [empDetail, setEmpDetail] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -136,6 +137,17 @@ export default function Admin({ profile, isReadOnly }) {
   }, [listingsPeriod, overviewPeriod, overviewFrom, overviewTo, date]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function handleToggleActive(emp, active) {
+    if (!active && !confirm(`Deactivate ${emp.full_name}? They will be hidden from lists but all their data is kept.`)) return;
+    const { data: { session: sess } } = await supabase.auth.getSession();
+    await fetch('/api/admin/toggle-active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sess?.access_token}` },
+      body: JSON.stringify({ userId: emp.id, active }),
+    });
+    loadData();
+  }
 
   async function handleToggleChecklist(emp) {
     const { data: { session: sess } } = await supabase.auth.getSession();
@@ -339,10 +351,10 @@ export default function Admin({ profile, isReadOnly }) {
     return { emp, count: empListings.length, complete, batches, totalValue };
   }
 
-  // Main employee summary (excludes Returns)
+  // Main employee summary (excludes Returns and inactive)
   const roleOrder = { employee: 0, manager: 1, supervisor: 2 };
   const employeeSummary = employees
-    .filter(emp => emp.location !== 'Returns')
+    .filter(emp => emp.location !== 'Returns' && emp.active !== false)
     .map(buildEmpStats)
     .filter(e => location === 'All Locations' || e.emp.location === location)
     .sort((a, b) => {
@@ -352,10 +364,12 @@ export default function Admin({ profile, isReadOnly }) {
       return a.emp.full_name.localeCompare(b.emp.full_name);
     });
 
-  // Returns employee summary (separate)
+  // Returns employee summary (separate, active only)
   const returnsEmployeeSummary = employees
-    .filter(emp => emp.location === 'Returns')
+    .filter(emp => emp.location === 'Returns' && emp.active !== false)
     .map(buildEmpStats);
+
+  const formerStaff = employees.filter(emp => emp.active === false);
 
   const PAGE_SIZE = 10;
   const totalListingsPages = Math.ceil(filteredListings.length / PAGE_SIZE);
@@ -542,7 +556,7 @@ export default function Admin({ profile, isReadOnly }) {
                     style={{ ...inputStyle, width: 160 }}>
                     <option value="">All Employees</option>
                     {employees.filter(e => location === 'All Locations' || e.location === location).map(e => (
-                      <option key={e.id} value={e.id}>{e.full_name}</option>
+                      <option key={e.id} value={e.id}>{e.full_name}{e.active === false ? ' (former)' : ''}</option>
                     ))}
                   </select>
                   <input type="text" placeholder="Search Serial ID…"
@@ -786,6 +800,10 @@ export default function Admin({ profile, isReadOnly }) {
                             <option value="supervisor">Supervisor</option>
                             <option value="viewer">Viewer</option>
                           </select>
+                          <button onClick={() => handleToggleActive(emp, false)} style={{
+                            background: 'none', border: '1px solid #e8c0c0', borderRadius: 5,
+                            padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#c0392b', whiteSpace: 'nowrap',
+                          }}>Deactivate</button>
                         </div>
                       </td>}
                     </tr>
@@ -920,6 +938,46 @@ export default function Admin({ profile, isReadOnly }) {
                   <span style={{ fontSize: 13, color: '#666' }}>Page {listingsPage} of {totalListingsPages} · {filteredListings.length} total</span>
                   <button onClick={() => setListingsPage(p => Math.min(totalListingsPages, p + 1))} disabled={listingsPage === totalListingsPages}
                     style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: listingsPage === totalListingsPages ? 'not-allowed' : 'pointer', color: listingsPage === totalListingsPages ? '#ccc' : '#444', fontWeight: 600, fontSize: 12 }}>Next →</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Former staff section */}
+          {activeTab === 'overview' && formerStaff.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <button onClick={() => setShowFormerStaff(s => !s)} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 12, color: '#888', fontWeight: 600, padding: '4px 0',
+              }}>
+                {showFormerStaff ? '▾' : '▸'} {formerStaff.length} former staff member{formerStaff.length !== 1 ? 's' : ''}
+              </button>
+              {showFormerStaff && (
+                <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden', marginTop: 6, opacity: 0.8 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#f5f5f5' }}>
+                        {['Name', 'Location', 'Role', ''].map(h => (
+                          <th key={h} style={thStyle}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formerStaff.map((emp, i) => (
+                        <tr key={emp.id} style={{ background: i % 2 === 0 ? '#fafafa' : '#f5f5f5', borderBottom: '1px solid #eee' }}>
+                          <td style={{ ...tdStyle, color: '#888', fontWeight: 600 }}>{emp.full_name}</td>
+                          <td style={{ ...tdStyle, color: '#aaa' }}>{emp.location}</td>
+                          <td style={{ ...tdStyle, color: '#aaa', textTransform: 'capitalize' }}>{emp.role}</td>
+                          <td style={tdStyle}>
+                            {!isReadOnly && <button onClick={() => handleToggleActive(emp, true)} style={{
+                              background: '#d4edda', border: '1px solid #c3e6cb', borderRadius: 5,
+                              padding: '3px 10px', fontSize: 11, cursor: 'pointer', color: '#155724', fontWeight: 700,
+                            }}>Reactivate</button>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
