@@ -430,6 +430,10 @@ export default function Admin({ profile, isReadOnly }) {
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
             }}>My Listings</button>}
+            {profile.specs_guide_beta && <button onClick={() => router.push('/specs-guide')} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+              padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}>Specs Guide</button>}
             {!isReadOnly && <button onClick={() => setShowCreate(true)} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
