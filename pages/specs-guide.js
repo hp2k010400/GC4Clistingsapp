@@ -39,7 +39,9 @@ export default function SpecsGuide({ profile }) {
 
   const [clubType, setClubType] = useState('irons');
   const [search, setSearch] = useState('');
+  const [brand, setBrand] = useState('');
   const [models, setModels] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -54,6 +56,7 @@ export default function SpecsGuide({ profile }) {
     const { data: { session } } = await supabase.auth.getSession();
     const params = new URLSearchParams({ club_type: clubType });
     if (search.trim()) params.set('search', search.trim());
+    if (brand) params.set('brand', brand);
     const res = await fetch(`/api/specs/list?${params.toString()}`, {
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -63,9 +66,10 @@ export default function SpecsGuide({ profile }) {
       setModels([]);
     } else {
       setModels(data.models);
+      setBrands(data.brands || []);
     }
     setLoading(false);
-  }, [clubType, search]);
+  }, [clubType, search, brand]);
 
   useEffect(() => { fetchModels(); }, [fetchModels]);
 
@@ -150,7 +154,7 @@ export default function SpecsGuide({ profile }) {
           }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {CLUB_TYPES.map(({ key, label }) => (
-                <button key={key} onClick={() => setClubType(key)} style={{
+                <button key={key} onClick={() => { setClubType(key); setBrand(''); }} style={{
                   padding: '6px 14px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer',
                   border: 'none',
                   background: clubType === key ? GREEN : '#f0f4f0',
@@ -161,6 +165,10 @@ export default function SpecsGuide({ profile }) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', alignItems: 'center' }}>
+              <select value={brand} onChange={e => setBrand(e.target.value)} style={{ ...inputStyle, width: 160 }}>
+                <option value="">All Brands</option>
+                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
