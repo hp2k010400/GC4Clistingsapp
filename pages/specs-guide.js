@@ -37,6 +37,35 @@ const BRAND_PILL = { background: '#eef2ff', color: '#4338ca' };
 const YEAR_PILL = { background: '#e6f4ea', color: '#1a7a3d' };
 const LOFT_PILL = { background: '#fff4e5', color: '#9a5b00' };
 
+const BRAND_PALETTE = [
+  { background: '#eef2ff', color: '#4338ca' }, // indigo
+  { background: '#fdf2f8', color: '#be185d' }, // rose
+  { background: '#fffbeb', color: '#b45309' }, // amber
+  { background: '#ecfdf5', color: '#047857' }, // emerald
+  { background: '#eff6ff', color: '#1d4ed8' }, // sky
+  { background: '#f5f3ff', color: '#6d28d9' }, // violet
+  { background: '#f0fdfa', color: '#0f766e' }, // teal
+  { background: '#fff7ed', color: '#c2410c' }, // orange
+  { background: '#fdf4ff', color: '#a21caf' }, // fuchsia
+  { background: '#f7fee7', color: '#4d7c0f' }, // lime
+  { background: '#ecfeff', color: '#0e7490' }, // cyan
+  { background: '#fef2f2', color: '#b91c1c' }, // red
+  { background: '#faf5ff', color: '#7e22ce' }, // purple
+  { background: '#fefce8', color: '#a16207' }, // yellow
+  { background: '#f8fafc', color: '#475569' }, // slate
+];
+
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+function brandColor(brand) {
+  if (!brand) return BRAND_PILL;
+  return BRAND_PALETTE[hashString(brand) % BRAND_PALETTE.length];
+}
+
 const COLUMN_COLORS = {
   brand:  { header: '#e2e4fa', body: '#f7f8ff' },
   model:  { header: '#eceeec', body: '#ffffff' },
@@ -244,7 +273,7 @@ export default function SpecsGuide({ profile }) {
                       const variants = m.spec_variants?.length ? m.spec_variants : [{}];
                       return variants.map((v, i) => (
                         <tr key={`${m.id}-${v.id || i}`} className="specs-row">
-                          {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.brand.body, borderRight: DIVIDER }} rowSpan={variants.length}><Pill colors={BRAND_PILL}>{m.brand}</Pill></td>}
+                          {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.brand.body, borderRight: DIVIDER }} rowSpan={variants.length}><Pill colors={brandColor(m.brand)}>{m.brand}</Pill></td>}
                           {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.model.body, borderRight: DIVIDER, fontWeight: 700, color: '#1a1a1a' }} rowSpan={variants.length}>{m.model_name}</td>}
                           {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.year.body, borderRight: DIVIDER }} rowSpan={variants.length}><Pill colors={YEAR_PILL}>{m.year}</Pill></td>}
                           <td style={{ ...tdStyle, background: COLUMN_COLORS.loft.body, borderRight: DIVIDER }}><Pill colors={LOFT_PILL}>{v.loft}</Pill></td>
