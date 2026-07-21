@@ -139,3 +139,65 @@ create index on public.time_away_notes (user_id, date);
 --
 -- Then use the "+ Add Employee" button in the app to create employee accounts.
 -- ============================================================
+
+-- ============================================================
+-- Specs Guide (phase 1 — Irons only, beta-gated to specific users)
+-- ============================================================
+-- Replaces Martin Lord's "Master Spec Guide" Excel workbook. A model
+-- (spec_models) can have one or more loft/length variants (spec_variants) —
+-- Irons (sets) always has exactly one variant per model with loft = null,
+-- but Drivers/Fairways/Hybrids/Single Irons/Wedges (not yet migrated) need
+-- multiple variants per model, hence the split from the start.
+
+alter table public.profiles
+  add column if not exists specs_guide_beta boolean not null default false;
+
+create table public.spec_models (
+  id          uuid primary key default gen_random_uuid(),
+  club_type   text not null check (club_type in ('drivers', 'fairways', 'hybrids', 'single_irons', 'irons', 'wedges')),
+  brand       text,
+  model_name  text not null,
+  year        int,
+  created_at  timestamptz not null default now(),
+  created_by  uuid references public.profiles(id)
+);
+
+create table public.spec_variants (
+  id             uuid primary key default gen_random_uuid(),
+  model_id       uuid not null references public.spec_models(id) on delete cascade,
+  loft           text,
+  mens_length    text,
+  womens_length  text,
+  notes          text,
+  created_at     timestamptz not null default now()
+);
+
+create index on public.spec_models (club_type);
+create index on public.spec_models (brand);
+create index on public.spec_variants (model_id);
+
+alter table public.spec_models   enable row level security;
+alter table public.spec_variants enable row level security;
+
+create or replace function public.has_specs_guide_access()
+returns boolean language sql security definer as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and specs_guide_beta = true
+  );
+$$;
+
+create policy "Specs guide access" on public.spec_models
+  for all using (public.has_specs_guide_access()) with check (public.has_specs_guide_access());
+
+create policy "Specs guide access" on public.spec_variants
+  for all using (public.has_specs_guide_access()) with check (public.has_specs_guide_access());
+
+grant all on public.spec_models, public.spec_variants to authenticated, service_role;
+
+-- Give yourself beta access (run after finding your own auth user id):
+--
+--   update public.profiles set specs_guide_beta = true where id = '<your-auth-user-id>';
+--
+-- Then run supabase/seed_specs_irons.sql to load the migrated Irons (sets) data.
+-- ============================================================
