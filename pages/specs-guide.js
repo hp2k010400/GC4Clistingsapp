@@ -33,6 +33,20 @@ const inputStyle = {
   borderRadius: 6, fontSize: 13, outline: 'none', background: '#fafafa',
 };
 
+const BRAND_PILL = { background: '#eef2ff', color: '#4338ca' };
+const YEAR_PILL = { background: '#e6f4ea', color: '#1a7a3d' };
+const LOFT_PILL = { background: '#fff4e5', color: '#9a5b00' };
+
+function Pill({ children, colors }) {
+  if (!children || children === '—') return <span style={{ color: '#bbb' }}>—</span>;
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 9px', borderRadius: 20,
+      fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', ...colors,
+    }}>{children}</span>
+  );
+}
+
 export default function SpecsGuide({ profile }) {
   const router = useRouter();
   const supabase = createClient();
@@ -193,44 +207,59 @@ export default function SpecsGuide({ profile }) {
 
           <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
             {loading ? (
-              <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading…</div>
+              <div style={{ padding: 48, textAlign: 'center' }}>
+                <div className="specs-spinner" />
+              </div>
             ) : error ? (
               <div style={{ padding: 24, textAlign: 'center', color: '#c0392b', fontSize: 13 }}>{error}</div>
             ) : models.length === 0 ? (
               <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 13 }}>No models found.</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f0f4f0' }}>
-                    <th style={thStyle}>Brand</th>
-                    <th style={thStyle}>Model</th>
-                    <th style={thStyle}>Year</th>
-                    <th style={thStyle}>Loft</th>
-                    <th style={thStyle}>Mens Length</th>
-                    <th style={thStyle}>Ladies Length</th>
-                    <th style={thStyle}>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {models.flatMap(m => {
-                    const variants = m.spec_variants?.length ? m.spec_variants : [{}];
-                    return variants.map((v, i) => (
-                      <tr key={`${m.id}-${v.id || i}`} style={{ borderTop: '1px solid #eee' }}>
-                        {i === 0 && <td style={tdStyle} rowSpan={variants.length}>{m.brand || '—'}</td>}
-                        {i === 0 && <td style={tdStyle} rowSpan={variants.length}>{m.model_name}</td>}
-                        {i === 0 && <td style={tdStyle} rowSpan={variants.length}>{m.year || '—'}</td>}
-                        <td style={tdStyle}>{v.loft || '—'}</td>
-                        <td style={tdStyle}>{v.mens_length || '—'}</td>
-                        <td style={tdStyle}>{v.womens_length || '—'}</td>
-                        <td style={{ ...tdStyle, color: '#888' }}>{v.notes || ''}</td>
-                      </tr>
-                    ));
-                  })}
-                </tbody>
-              </table>
+              <div style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Brand</th>
+                      <th style={thStyle}>Model</th>
+                      <th style={thStyle}>Year</th>
+                      <th style={thStyle}>Loft</th>
+                      <th style={thStyle}>Mens Length</th>
+                      <th style={thStyle}>Ladies Length</th>
+                      <th style={thStyle}>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {models.flatMap((m, mi) => {
+                      const variants = m.spec_variants?.length ? m.spec_variants : [{}];
+                      const stripe = mi % 2 === 1 ? '#fafbfa' : '#fff';
+                      return variants.map((v, i) => (
+                        <tr key={`${m.id}-${v.id || i}`} className="specs-row" style={{ background: stripe }}>
+                          {i === 0 && <td style={tdStyle} rowSpan={variants.length}><Pill colors={BRAND_PILL}>{m.brand}</Pill></td>}
+                          {i === 0 && <td style={{ ...tdStyle, fontWeight: 700, color: '#1a1a1a' }} rowSpan={variants.length}>{m.model_name}</td>}
+                          {i === 0 && <td style={tdStyle} rowSpan={variants.length}><Pill colors={YEAR_PILL}>{m.year}</Pill></td>}
+                          <td style={tdStyle}><Pill colors={LOFT_PILL}>{v.loft}</Pill></td>
+                          <td style={tdStyle}>{v.mens_length || <span style={{ color: '#bbb' }}>—</span>}</td>
+                          <td style={tdStyle}>{v.womens_length || <span style={{ color: '#bbb' }}>—</span>}</td>
+                          <td style={{ ...tdStyle, color: '#999', fontStyle: v.notes ? 'normal' : undefined }}>{v.notes || ''}</td>
+                        </tr>
+                      ));
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
           <div style={{ fontSize: 12, color: '#999', marginTop: 10 }}>{models.length} model{models.length === 1 ? '' : 's'}</div>
+
+          <style jsx>{`
+            .specs-row:hover td { background: #eef5ee !important; }
+            .specs-spinner {
+              width: 28px; height: 28px; margin: 0 auto;
+              border: 3px solid #e2e8e2; border-top-color: ${GREEN};
+              border-radius: 50%; animation: specs-spin 0.7s linear infinite;
+            }
+            @keyframes specs-spin { to { transform: rotate(360deg); } }
+          `}</style>
         </div>
 
         {showAdd && (
@@ -322,9 +351,12 @@ export default function SpecsGuide({ profile }) {
 const thStyle = {
   textAlign: 'left', padding: '9px 12px', fontWeight: 700, fontSize: 11,
   textTransform: 'uppercase', letterSpacing: '0.04em', color: '#555',
+  position: 'sticky', top: 0, background: '#f0f4f0', zIndex: 1,
+  boxShadow: 'inset 0 -1px 0 #e0e0e0',
 };
 const tdStyle = {
   padding: '9px 12px', fontSize: 13, color: '#222', verticalAlign: 'top',
+  borderBottom: '1px solid #f0f0f0',
 };
 
 export async function getServerSideProps({ req, res }) {
