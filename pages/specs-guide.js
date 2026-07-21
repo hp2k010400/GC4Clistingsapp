@@ -37,6 +37,17 @@ const BRAND_PILL = { background: '#eef2ff', color: '#4338ca' };
 const YEAR_PILL = { background: '#e6f4ea', color: '#1a7a3d' };
 const LOFT_PILL = { background: '#fff4e5', color: '#9a5b00' };
 
+const COLUMN_COLORS = {
+  brand:  { header: '#e2e4fa', body: '#f7f8ff' },
+  model:  { header: '#eceeec', body: '#ffffff' },
+  year:   { header: '#dcefe1', body: '#f5faf6' },
+  loft:   { header: '#fbe9d0', body: '#fffaf2' },
+  mens:   { header: '#dbeaf5', body: '#f3f8fb' },
+  ladies: { header: '#fbdfec', body: '#fdf4f8' },
+  notes:  { header: '#ececec', body: '#fafafa' },
+};
+const DIVIDER = '1px solid rgba(0,0,0,0.08)';
+
 function Pill({ children, colors }) {
   if (!children || children === '—') return <span style={{ color: '#bbb' }}>—</span>;
   return (
@@ -219,28 +230,27 @@ export default function SpecsGuide({ profile }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Brand</th>
-                      <th style={thStyle}>Model</th>
-                      <th style={thStyle}>Year</th>
-                      <th style={thStyle}>Loft</th>
-                      <th style={thStyle}>Mens Length</th>
-                      <th style={thStyle}>Ladies Length</th>
-                      <th style={thStyle}>Notes</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.brand.header, borderRight: DIVIDER }}>Brand</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.model.header, borderRight: DIVIDER }}>Model</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.year.header, borderRight: DIVIDER }}>Year</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.loft.header, borderRight: DIVIDER }}>Loft</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.mens.header, borderRight: DIVIDER }}>Mens Length</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.ladies.header, borderRight: DIVIDER }}>Ladies Length</th>
+                      <th style={{ ...thStyle, background: COLUMN_COLORS.notes.header }}>Notes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {models.flatMap((m, mi) => {
                       const variants = m.spec_variants?.length ? m.spec_variants : [{}];
-                      const stripe = mi % 2 === 1 ? '#fafbfa' : '#fff';
                       return variants.map((v, i) => (
-                        <tr key={`${m.id}-${v.id || i}`} className="specs-row" style={{ background: stripe }}>
-                          {i === 0 && <td style={tdStyle} rowSpan={variants.length}><Pill colors={BRAND_PILL}>{m.brand}</Pill></td>}
-                          {i === 0 && <td style={{ ...tdStyle, fontWeight: 700, color: '#1a1a1a' }} rowSpan={variants.length}>{m.model_name}</td>}
-                          {i === 0 && <td style={tdStyle} rowSpan={variants.length}><Pill colors={YEAR_PILL}>{m.year}</Pill></td>}
-                          <td style={tdStyle}><Pill colors={LOFT_PILL}>{v.loft}</Pill></td>
-                          <td style={tdStyle}>{v.mens_length || <span style={{ color: '#bbb' }}>—</span>}</td>
-                          <td style={tdStyle}>{v.womens_length || <span style={{ color: '#bbb' }}>—</span>}</td>
-                          <td style={{ ...tdStyle, color: '#999', fontStyle: v.notes ? 'normal' : undefined }}>{v.notes || ''}</td>
+                        <tr key={`${m.id}-${v.id || i}`} className="specs-row">
+                          {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.brand.body, borderRight: DIVIDER }} rowSpan={variants.length}><Pill colors={BRAND_PILL}>{m.brand}</Pill></td>}
+                          {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.model.body, borderRight: DIVIDER, fontWeight: 700, color: '#1a1a1a' }} rowSpan={variants.length}>{m.model_name}</td>}
+                          {i === 0 && <td style={{ ...tdStyle, background: COLUMN_COLORS.year.body, borderRight: DIVIDER }} rowSpan={variants.length}><Pill colors={YEAR_PILL}>{m.year}</Pill></td>}
+                          <td style={{ ...tdStyle, background: COLUMN_COLORS.loft.body, borderRight: DIVIDER }}><Pill colors={LOFT_PILL}>{v.loft}</Pill></td>
+                          <td style={{ ...tdStyle, background: COLUMN_COLORS.mens.body, borderRight: DIVIDER, fontWeight: 700 }}>{v.mens_length || <span style={{ color: '#bbb', fontWeight: 400 }}>—</span>}</td>
+                          <td style={{ ...tdStyle, background: COLUMN_COLORS.ladies.body, borderRight: DIVIDER, fontWeight: 700 }}>{v.womens_length || <span style={{ color: '#bbb', fontWeight: 400 }}>—</span>}</td>
+                          <td style={{ ...tdStyle, background: COLUMN_COLORS.notes.body, color: '#999' }}>{v.notes || ''}</td>
                         </tr>
                       ));
                     })}
@@ -351,8 +361,8 @@ export default function SpecsGuide({ profile }) {
 const thStyle = {
   textAlign: 'left', padding: '9px 12px', fontWeight: 700, fontSize: 11,
   textTransform: 'uppercase', letterSpacing: '0.04em', color: '#555',
-  position: 'sticky', top: 0, background: '#f0f4f0', zIndex: 1,
-  boxShadow: 'inset 0 -1px 0 #e0e0e0',
+  position: 'sticky', top: 0, zIndex: 1,
+  boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.08)',
 };
 const tdStyle = {
   padding: '9px 12px', fontSize: 13, color: '#222', verticalAlign: 'top',
