@@ -430,10 +430,10 @@ export default function Admin({ profile, isReadOnly }) {
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
             }}>My Listings</button>}
-            {profile.specs_guide_beta && <button onClick={() => router.push('/specs-guide')} style={{
-              background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+            {profile.specs_guide_beta && <a href="https://gc4c-specs-guide.netlify.app" target="_blank" rel="noopener noreferrer" style={{
+              background: 'rgba(255,255,255,0.15)', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            }}>Specs Guide</button>}
+            }}>Specs Guide ↗</a>}
             {!isReadOnly && <button onClick={() => setShowCreate(true)} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
               padding: '4px 12px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 600,
